@@ -18,7 +18,7 @@ target_compile_options(poker_server_lib PRIVATE -Wall -Wextra -Wpedantic)
 
 add_executable(poker_server src/main.cpp)
 target_link_libraries(poker_server PRIVATE poker_server_lib)
-
+target_link_libraries(poker_server PRIVATE common_lib)
 
 enable_testing()
 
@@ -28,6 +28,7 @@ add_executable(poker_server_tests
 )
 
 target_link_libraries(poker_server_tests PRIVATE poker_server_lib)
+target_link_libraries(poker_server_tests PRIVATE common_lib)
 target_include_directories(poker_server_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/external
 )
