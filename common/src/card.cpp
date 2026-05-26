@@ -1,4 +1,1 @@
-#include "card.h"
-
-namespace common {
-}
+#include "poker/card.h"

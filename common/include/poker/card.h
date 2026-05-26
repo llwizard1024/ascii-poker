@@ -2,8 +2,6 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace common {
-
 enum class Suit : uint8_t {
     Clubs = 0,
     Diamonds = 1,
@@ -60,4 +58,3 @@ private:
         2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41
     };
 };
-}

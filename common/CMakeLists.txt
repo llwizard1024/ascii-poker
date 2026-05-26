@@ -1,21 +1,14 @@
-add_library(common_lib STATIC
+cmake_minimum_required(VERSION 3.20)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+add_library(poker_core STATIC
     src/card.cpp
     src/deck.cpp
-    src/evaluator.cpp
 )
 
-target_include_directories(common_lib PUBLIC 
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-)
-
-enable_testing()
-
-add_executable(common_lib_tests
-    external/catch2/catch_amalgamated.cpp
-    tests/test_evaluator.cpp
-)
-
-target_link_libraries(common_lib_tests PRIVATE common_lib)
-target_include_directories(common_lib_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/external
+target_include_directories(poker_core PUBLIC 
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
