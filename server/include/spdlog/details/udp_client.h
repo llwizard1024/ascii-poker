@@ -25,56 +25,61 @@
 namespace spdlog {
 namespace details {
 
-class udp_client {
-    static constexpr int TX_BUFFER_SIZE = 1024 * 10;
-    int socket_ = -1;
-    struct sockaddr_in sockAddr_;
+    class udp_client {
+        static constexpr int TX_BUFFER_SIZE = 1024 * 10;
+        int socket_ = -1;
+        struct sockaddr_in sockAddr_;
 
-    void cleanup_() {
-        if (socket_ != -1) {
-            ::close(socket_);
-            socket_ = -1;
-        }
-    }
-
-public:
-    udp_client(const std::string &host, uint16_t port) {
-        socket_ = ::socket(PF_INET, SOCK_DGRAM, 0);
-        if (socket_ < 0) {
-            throw_spdlog_ex("error: Create Socket Failed!");
+        void cleanup_()
+        {
+            if (socket_ != -1) {
+                ::close(socket_);
+                socket_ = -1;
+            }
         }
 
-        int option_value = TX_BUFFER_SIZE;
-        if (::setsockopt(socket_, SOL_SOCKET, SO_SNDBUF,
-                         reinterpret_cast<const char *>(&option_value), sizeof(option_value)) < 0) {
-            cleanup_();
-            throw_spdlog_ex("error: setsockopt(SO_SNDBUF) Failed!");
+    public:
+        udp_client(const std::string& host, uint16_t port)
+        {
+            socket_ = ::socket(PF_INET, SOCK_DGRAM, 0);
+            if (socket_ < 0) {
+                throw_spdlog_ex("error: Create Socket Failed!");
+            }
+
+            int option_value = TX_BUFFER_SIZE;
+            if (::setsockopt(socket_, SOL_SOCKET, SO_SNDBUF,
+                    reinterpret_cast<const char*>(&option_value), sizeof(option_value))
+                < 0) {
+                cleanup_();
+                throw_spdlog_ex("error: setsockopt(SO_SNDBUF) Failed!");
+            }
+
+            sockAddr_.sin_family = AF_INET;
+            sockAddr_.sin_port = htons(port);
+
+            if (::inet_aton(host.c_str(), &sockAddr_.sin_addr) == 0) {
+                cleanup_();
+                throw_spdlog_ex("error: Invalid address!");
+            }
+
+            ::memset(sockAddr_.sin_zero, 0x00, sizeof(sockAddr_.sin_zero));
         }
 
-        sockAddr_.sin_family = AF_INET;
-        sockAddr_.sin_port = htons(port);
+        ~udp_client() { cleanup_(); }
 
-        if (::inet_aton(host.c_str(), &sockAddr_.sin_addr) == 0) {
-            cleanup_();
-            throw_spdlog_ex("error: Invalid address!");
+        int fd() const { return socket_; }
+
+        // Send exactly n_bytes of the given data.
+        // On error close the connection and throw.
+        void send(const char* data, size_t n_bytes)
+        {
+            socklen_t tolen = sizeof(sockAddr_);
+            if (::sendto(socket_, data, n_bytes, 0, reinterpret_cast<const sockaddr*>(&sockAddr_),
+                    tolen)
+                == -1) {
+                throw_spdlog_ex("sendto(2) failed", errno);
+            }
         }
-
-        ::memset(sockAddr_.sin_zero, 0x00, sizeof(sockAddr_.sin_zero));
-    }
-
-    ~udp_client() { cleanup_(); }
-
-    int fd() const { return socket_; }
-
-    // Send exactly n_bytes of the given data.
-    // On error close the connection and throw.
-    void send(const char *data, size_t n_bytes) {
-        socklen_t tolen = sizeof(sockAddr_);
-        if (::sendto(socket_, data, n_bytes, 0, reinterpret_cast<const sockaddr *>(&sockAddr_),
-                     tolen) == -1) {
-            throw_spdlog_ex("sendto(2) failed", errno);
-        }
-    }
-};
-}  // namespace details
-}  // namespace spdlog
+    };
+} // namespace details
+} // namespace spdlog

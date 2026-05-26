@@ -8,11 +8,11 @@ class logger;
 class formatter;
 
 namespace sinks {
-class sink;
+    class sink;
 }
 
 namespace level {
-enum level_enum : int;
+    enum level_enum : int;
 }
 
-}  // namespace spdlog
+} // namespace spdlog

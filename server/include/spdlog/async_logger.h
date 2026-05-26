@@ -20,14 +20,14 @@ namespace spdlog {
 
 // Async overflow policy - block by default.
 enum class async_overflow_policy {
-    block,           // Block until message can be enqueued
-    overrun_oldest,  // Discard oldest message in the queue if full when trying to
-                     // add new item.
-    discard_new      // Discard new message if the queue is full when trying to add new item.
+    block, // Block until message can be enqueued
+    overrun_oldest, // Discard oldest message in the queue if full when trying to
+                    // add new item.
+    discard_new // Discard new message if the queue is full when trying to add new item.
 };
 
 namespace details {
-class thread_pool;
+    class thread_pool;
 }
 
 class SPDLOG_API async_logger final : public std::enable_shared_from_this<async_logger>,
@@ -37,37 +37,39 @@ class SPDLOG_API async_logger final : public std::enable_shared_from_this<async_
 public:
     template <typename It>
     async_logger(std::string logger_name,
-                 It begin,
-                 It end,
-                 std::weak_ptr<details::thread_pool> tp,
-                 async_overflow_policy overflow_policy = async_overflow_policy::block)
-        : logger(std::move(logger_name), begin, end),
-          thread_pool_(std::move(tp)),
-          overflow_policy_(overflow_policy) {}
+        It begin,
+        It end,
+        std::weak_ptr<details::thread_pool> tp,
+        async_overflow_policy overflow_policy = async_overflow_policy::block)
+        : logger(std::move(logger_name), begin, end)
+        , thread_pool_(std::move(tp))
+        , overflow_policy_(overflow_policy)
+    {
+    }
 
     async_logger(std::string logger_name,
-                 sinks_init_list sinks_list,
-                 std::weak_ptr<details::thread_pool> tp,
-                 async_overflow_policy overflow_policy = async_overflow_policy::block);
+        sinks_init_list sinks_list,
+        std::weak_ptr<details::thread_pool> tp,
+        async_overflow_policy overflow_policy = async_overflow_policy::block);
 
     async_logger(std::string logger_name,
-                 sink_ptr single_sink,
-                 std::weak_ptr<details::thread_pool> tp,
-                 async_overflow_policy overflow_policy = async_overflow_policy::block);
+        sink_ptr single_sink,
+        std::weak_ptr<details::thread_pool> tp,
+        async_overflow_policy overflow_policy = async_overflow_policy::block);
 
     std::shared_ptr<logger> clone(std::string new_name) override;
 
 protected:
-    void sink_it_(const details::log_msg &msg) override;
+    void sink_it_(const details::log_msg& msg) override;
     void flush_() override;
-    void backend_sink_it_(const details::log_msg &incoming_log_msg);
+    void backend_sink_it_(const details::log_msg& incoming_log_msg);
     void backend_flush_();
 
 private:
     std::weak_ptr<details::thread_pool> thread_pool_;
     async_overflow_policy overflow_policy_;
 };
-}  // namespace spdlog
+} // namespace spdlog
 
 #ifdef SPDLOG_HEADER_ONLY
 #include "async_logger-inl.h"
