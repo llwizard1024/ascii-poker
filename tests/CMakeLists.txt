@@ -7,6 +7,7 @@ target_include_directories(Catch2 PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/external)
 
 add_executable(poker_tests 
     test_deck.cpp
+    test_protocol.cpp
 )
 
 target_link_libraries(poker_tests PRIVATE 
