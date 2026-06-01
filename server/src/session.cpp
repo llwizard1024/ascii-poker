@@ -1,12 +1,12 @@
 #include "session.h"
 
-#include "asio/buffer.hpp"
-#include "asio/read.hpp"
 #include "spdlog/spdlog.h"
 #include "json/json.hpp"
 
 #include "poker/protocol.h"
 
+#include <asio/buffer.hpp>
+#include <asio/read.hpp>
 #include <asio/write.hpp>
 #include <netinet/in.h>
 #include <variant>
@@ -108,7 +108,7 @@ void Session::do_read_body(uint32_t length)
                 on_message(body_buffer_);
                 do_read_header();
             } else {
-                socket_.close();
+                close_session();
             }
         });
 }
