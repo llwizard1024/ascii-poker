@@ -26,47 +26,71 @@ inline void from_json(const nlohmann::json& j, Card& card)
 
     char suit_char = str.back();
     Suit suit;
-    if (suit_char == 'C')
+    switch (suit_char) {
+    case 'C':
         suit = Suit::Clubs;
-    else if (suit_char == 'D')
+        break;
+    case 'D':
         suit = Suit::Diamonds;
-    else if (suit_char == 'H')
+        break;
+    case 'H':
         suit = Suit::Hearts;
-    else if (suit_char == 'S')
+        break;
+    case 'S':
         suit = Suit::Spades;
-    else
+        break;
+    default:
         throw std::runtime_error(std::string("Unknown card suit: ") + suit_char);
+    }
 
     std::string rank_str = str.substr(0, str.size() - 1);
     Rank rank;
-    if (rank_str == "2")
-        rank = Rank::Two;
-    else if (rank_str == "3")
-        rank = Rank::Three;
-    else if (rank_str == "4")
-        rank = Rank::Four;
-    else if (rank_str == "5")
-        rank = Rank::Five;
-    else if (rank_str == "6")
-        rank = Rank::Six;
-    else if (rank_str == "7")
-        rank = Rank::Seven;
-    else if (rank_str == "8")
-        rank = Rank::Eight;
-    else if (rank_str == "9")
-        rank = Rank::Nine;
-    else if (rank_str == "10")
+    if (rank_str == "10") {
         rank = Rank::Ten;
-    else if (rank_str == "J")
-        rank = Rank::Jack;
-    else if (rank_str == "Q")
-        rank = Rank::Queen;
-    else if (rank_str == "K")
-        rank = Rank::King;
-    else if (rank_str == "A")
-        rank = Rank::Ace;
-    else
+    } else if (rank_str.size() == 1) {
+        switch (rank_str[0]) {
+        case '2':
+            rank = Rank::Two;
+            break;
+        case '3':
+            rank = Rank::Three;
+            break;
+        case '4':
+            rank = Rank::Four;
+            break;
+        case '5':
+            rank = Rank::Five;
+            break;
+        case '6':
+            rank = Rank::Six;
+            break;
+        case '7':
+            rank = Rank::Seven;
+            break;
+        case '8':
+            rank = Rank::Eight;
+            break;
+        case '9':
+            rank = Rank::Nine;
+            break;
+        case 'J':
+            rank = Rank::Jack;
+            break;
+        case 'Q':
+            rank = Rank::Queen;
+            break;
+        case 'K':
+            rank = Rank::King;
+            break;
+        case 'A':
+            rank = Rank::Ace;
+            break;
+        default:
+            throw std::invalid_argument("Unknown card rank: " + rank_str);
+        }
+    } else {
         throw std::invalid_argument("Unknown card rank: " + rank_str);
+    }
 
     card = Card(suit, rank);
 }
