@@ -41,17 +41,34 @@ void Session::send_response(const pp::ServerMessage& msg)
     packet.insert(packet.end(), length_bytes, length_bytes + sizeof(network_length));
     packet.insert(packet.end(), json_str.begin(), json_str.end());
 
+    bool write_in_progress = !write_queue_.empty();
+
+    write_queue_.push_back(std::move(packet));
+
+    if (!write_in_progress) {
+        do_write();
+    }
+}
+
+void Session::do_write()
+{
     auto self = shared_from_this();
+
     asio::async_write(
         socket_,
-        asio::buffer(packet.data(), packet.size()),
-        [this, self, packet = std::move(packet)](const std::error_code& ec, std::size_t bytes_transferred) {
+        asio::buffer(write_queue_.front().data(), write_queue_.front().size()),
+        [this, self](const std::error_code& ec, std::size_t bytes_transferred) {
             if (!ec) {
                 spdlog::debug("Response successfully sent. Bytes: {}", bytes_transferred);
-                do_read_header();
+
+                write_queue_.pop_front();
+
+                if (!write_queue_.empty()) {
+                    do_write();
+                }
             } else {
-                spdlog::error("Failed to send response: {}", ec.message());
-                socket_.close();
+                spdlog::error("Write error: {}. Closing session.", ec.message());
+                close_session();
             }
         });
 }
@@ -74,7 +91,8 @@ void Session::do_read_header()
                 body_buffer_.resize(length);
                 do_read_body(length);
             } else {
-                socket_.close();
+                spdlog::warn("Read error: {}. Closing session.", ec.message());
+                close_session();
             }
         });
 }
@@ -88,6 +106,7 @@ void Session::do_read_body(uint32_t length)
         [this, self](const std::error_code& ec, std::size_t) {
             if (!ec) {
                 on_message(body_buffer_);
+                do_read_header();
             } else {
                 socket_.close();
             }
@@ -133,4 +152,20 @@ void Session::on_message(const std::string& json)
         msg);
 
     send_response(pp::ServerMessage { pp::Error { 0, "echo: " + json } });
+}
+
+void Session::close_session()
+{
+    if (!socket_.is_open()) {
+        return;
+    }
+
+    std::error_code ec;
+    socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+
+    socket_.close(ec);
+
+    write_queue_.clear();
+
+    spdlog::info("Session successfully closed and cleaned up.");
 }
