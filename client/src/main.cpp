@@ -7,7 +7,7 @@
 
 #include <iostream>
 
-int main() 
+int main()
 {
     spdlog::set_level(spdlog::level::info);
 
@@ -20,9 +20,8 @@ int main()
         });
 
         client->start();
-        client->send(poker::protocol::ClientMessage{
-            poker::protocol::CreateRoom{"test_room", 4}
-        });
+        client->send(poker::protocol::ClientMessage {
+            poker::protocol::CreateRoom { "test_room", 4 } });
 
         io.run();
     } catch (const std::exception& e) {

@@ -66,7 +66,8 @@ void NetworkClient::do_read_header()
             if (!ec && bytes_transferred == 4) {
                 uint32_t network_length;
                 std::memcpy(&network_length, header_buffer_.data(), sizeof(network_length));
-                uint32_t length = ntohl(network_length);                body_buffer_.resize(length);
+                uint32_t length = ntohl(network_length);
+                body_buffer_.resize(length);
                 do_read_body(length);
             } else {
                 spdlog::warn("Read error: {}. Closing session.", ec.message());
