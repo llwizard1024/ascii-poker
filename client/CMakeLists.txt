@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 add_library(poker_client_lib STATIC
     src/network_client.cpp
     src/command.cpp
+    src/application.cpp
 )
 
 target_include_directories(poker_client_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
