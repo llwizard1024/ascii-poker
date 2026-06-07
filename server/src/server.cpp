@@ -1,5 +1,7 @@
 #include "server.h"
+
 #include "session.h"
+#include "echo_message_processor.h"
 
 #include <spdlog/spdlog.h>
 
@@ -16,7 +18,7 @@ void Server::start_accept()
             if (!ec) {
                 spdlog::info("New client connected from {}",
                     socket.remote_endpoint().address().to_string());
-                std::make_shared<Session>(std::move(socket))->start();
+                std::make_shared<Session>(std::move(socket), std::make_shared<EchoMessageProcessor>())->start();
             } else {
                 spdlog::error("Accept error: {}", ec.message());
             }

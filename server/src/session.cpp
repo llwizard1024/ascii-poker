@@ -14,8 +14,9 @@
 
 namespace pp = poker::protocol;
 
-Session::Session(asio::ip::tcp::socket socket)
+Session::Session(asio::ip::tcp::socket socket, std::shared_ptr<IMessageProcessor> processor)
     : socket_(std::move(socket))
+    , processor_(std::move(processor))
 {
 }
 
@@ -118,43 +119,7 @@ void Session::do_read_body(uint32_t length)
 
 void Session::on_message(const std::string& json)
 {
-    nlohmann::json data;
-
-    try {
-        data = nlohmann::json::parse(json);
-    } catch (const nlohmann::json::parse_error& e) {
-        spdlog::error(e.what());
-
-        send_response(pp::ServerMessage { pp::Error { 1, "Invalid JSON: " + std::string(e.what()) } });
-        return;
-    }
-
-    pp::ClientMessage msg;
-
-    try {
-        msg = data.get<pp::ClientMessage>();
-    } catch (const std::exception& e) {
-        spdlog::error(e.what());
-
-        send_response(pp::ServerMessage { pp::Error { 2, e.what() } });
-        return;
-    }
-
-    std::visit([](const auto& concrete_msg) {
-        using T = std::decay_t<decltype(concrete_msg)>;
-        if constexpr (std::is_same_v<T, pp::CreateRoom>) {
-            spdlog::info("Create Room Message");
-        } else if constexpr (std::is_same_v<T, pp::JoinRoom>) {
-            spdlog::info("Join Room Message");
-        } else if constexpr (std::is_same_v<T, pp::LeaveRoom>) {
-            spdlog::info("Leave Room Message");
-        } else if constexpr (std::is_same_v<T, pp::PlayerAction>) {
-            spdlog::info("Player Action Message");
-        }
-    },
-        msg);
-
-    send_response(pp::ServerMessage { pp::Error { 0, "echo: " + json } });
+    processor_->process_message(json, shared_from_this());
 }
 
 void Session::close_session()
