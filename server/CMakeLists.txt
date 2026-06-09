@@ -5,6 +5,7 @@ add_library(poker_server_lib STATIC
     src/session.cpp
     src/echo_message_processor.cpp
     src/room.cpp
+    src/lobby.cpp
 )
 
 target_include_directories(poker_server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
