@@ -12,12 +12,13 @@
 
 class Session : public std::enable_shared_from_this<Session> {
 public:
-    explicit Session(asio::ip::tcp::socket socket, std::shared_ptr<IMessageProcessor> processor);
+    explicit Session(asio::ip::tcp::socket socket, std::shared_ptr<IMessageProcessor> processor, const std::string& player_name);
     ~Session();
     void start();
     void do_write();
     void close_session();
     void send_response(const poker::protocol::ServerMessage& msg);
+    std::string get_name() const { return player_name_; }
 
 private:
     void do_read_header();
@@ -29,4 +30,5 @@ private:
     std::string body_buffer_;
     std::deque<std::vector<uint8_t>> write_queue_;
     std::shared_ptr<IMessageProcessor> processor_;
+    std::string player_name_;
 };

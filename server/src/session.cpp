@@ -14,9 +14,10 @@
 
 namespace pp = poker::protocol;
 
-Session::Session(asio::ip::tcp::socket socket, std::shared_ptr<IMessageProcessor> processor)
+Session::Session(asio::ip::tcp::socket socket, std::shared_ptr<IMessageProcessor> processor, const std::string& player_name)
     : socket_(std::move(socket))
     , processor_(std::move(processor))
+    , player_name_(player_name)
 {
 }
 
