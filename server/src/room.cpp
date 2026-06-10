@@ -58,7 +58,7 @@ bool Room::remove_player(std::shared_ptr<Session> player)
 
 poker::protocol::RoomInfo Room::get_room_info() const
 {
-    return poker::protocol::RoomInfo{
+    return poker::protocol::RoomInfo {
         id_,
         name_,
         static_cast<uint8_t>(players_.size()),
