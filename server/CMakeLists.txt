@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.20)
 
 add_library(poker_server_lib STATIC
-    src/server.cpp
-    src/session.cpp
-    src/echo_message_processor.cpp
-    src/room.cpp
-    src/lobby.cpp
+    src/network/server.cpp
+    src/network/session.cpp
+    src/messaging/echo_message_processor.cpp
+    src/game/room.cpp
+    src/game/lobby.cpp
 )
 
 target_include_directories(poker_server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

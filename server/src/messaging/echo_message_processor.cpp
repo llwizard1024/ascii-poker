@@ -1,7 +1,7 @@
 #include "echo_message_processor.h"
 
 #include "poker/protocol.h"
-#include "session.h"
+#include "../network/session.h"
 
 #include <spdlog/spdlog.h>
 

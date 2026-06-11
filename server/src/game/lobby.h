@@ -1,7 +1,7 @@
 #pragma once
 
 #include "room.h"
-#include "session.h"
+#include "../network/session.h"
 
 #include <memory>
 #include <unordered_map>

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "session.h"
+#include "../network/session.h"
 
 class Room {
 public:

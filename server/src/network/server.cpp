@@ -1,6 +1,6 @@
 #include "server.h"
 
-#include "echo_message_processor.h"
+#include "../messaging/echo_message_processor.h"
 #include "session.h"
 
 #include <spdlog/spdlog.h>

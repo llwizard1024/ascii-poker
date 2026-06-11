@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "i_message_processor.h"
+#include "../messaging/i_message_processor.h"
 #include "poker/protocol.h"
 
 class Session : public std::enable_shared_from_this<Session> {
