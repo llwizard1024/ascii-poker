@@ -1,7 +1,7 @@
 #pragma once
 
-#include "room.h"
 #include "../network/session.h"
+#include "room.h"
 
 #include <memory>
 #include <unordered_map>
@@ -13,6 +13,7 @@ public:
     bool join_room(uint64_t room_id, std::shared_ptr<Session> player);
     void leave_room(std::shared_ptr<Session> player);
     poker::protocol::RoomList get_room_list() const;
+    std::shared_ptr<Room> get_room(uint64_t id) const;
 
 private:
     std::vector<std::shared_ptr<Room>> rooms_;

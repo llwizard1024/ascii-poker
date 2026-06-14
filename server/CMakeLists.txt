@@ -4,6 +4,7 @@ add_library(poker_server_lib STATIC
     src/network/server.cpp
     src/network/session.cpp
     src/messaging/echo_message_processor.cpp
+    src/messaging/lobby_message_processor.cpp
     src/game/room.cpp
     src/game/lobby.cpp
 )

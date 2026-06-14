@@ -68,15 +68,22 @@ poker::protocol::RoomInfo Room::get_room_info() const
 
 void Room::notify_all_about_joined()
 {
-    std::vector<std::string> player_names;
-
-    for (const auto& elem : players_) {
-        player_names.push_back(elem->get_name());
-    }
+    std::vector<std::string> player_names = get_all_players_names();
 
     auto joined = poker::protocol::JoinedRoom { id_, std::move(player_names) };
 
     for (const auto& elem : players_) {
         elem->send_response(poker::protocol::ServerMessage { joined });
     }
+}
+
+std::vector<std::string> Room::get_all_players_names() const
+{
+    std::vector<std::string> player_names;
+
+    for (const auto& elem : players_) {
+        player_names.push_back(elem->get_name());
+    }
+
+    return player_names;
 }

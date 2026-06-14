@@ -88,3 +88,12 @@ poker::protocol::RoomList Lobby::get_room_list() const
 
     return room_list;
 }
+
+std::shared_ptr<Room> Lobby::get_room(uint64_t id) const
+{
+    auto it = std::find_if(rooms_.begin(), rooms_.end(), [id](const auto& room) {
+        return room->get_id() == id;
+    });
+
+    return it == rooms_.end() ? nullptr : *it;
+}

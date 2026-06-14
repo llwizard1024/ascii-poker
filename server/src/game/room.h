@@ -16,6 +16,7 @@ public:
     size_t player_count() const { return players_.size(); }
     uint64_t get_id() const { return id_; }
     std::string get_name() const { return name_; }
+    std::vector<std::string> get_all_players_names() const;
 
 private:
     uint64_t id_;

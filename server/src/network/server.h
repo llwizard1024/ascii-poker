@@ -1,6 +1,8 @@
 #pragma once
 
+#include "../game/lobby.h"
 #include "asio/ip/tcp.hpp"
+
 #include <memory>
 
 class Server {
@@ -10,4 +12,5 @@ public:
 
 private:
     asio::ip::tcp::acceptor acceptor_;
+    std::shared_ptr<Lobby> lobby_;
 };
