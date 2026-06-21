@@ -2,8 +2,9 @@
 
 #include <memory>
 
-#include <string>
 #include "poker/protocol.h"
+
+#include <string>
 
 class IPlayer {
 public:
