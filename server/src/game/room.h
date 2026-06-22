@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "../network/session.h"
+#include "game_session.h"
 
 class Room {
 public:
@@ -17,12 +18,15 @@ public:
     uint64_t get_id() const { return id_; }
     std::string get_name() const { return name_; }
     std::vector<std::string> get_all_players_names() const;
+    void start_game();
+    void on_player_action(std::shared_ptr<Session> player, poker::protocol::Action action, std::optional<uint32_t> amount);
 
 private:
     uint64_t id_;
     std::string name_;
     uint8_t max_players_;
     std::vector<std::shared_ptr<Session>> players_;
+    std::unique_ptr<GameSession> game_session_;
 
     void notify_all_about_joined();
 };

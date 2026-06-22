@@ -14,6 +14,7 @@ public:
     void leave_room(std::shared_ptr<Session> player);
     poker::protocol::RoomList get_room_list() const;
     std::shared_ptr<Room> get_room(uint64_t id) const;
+    std::shared_ptr<Room> find_room_by_player(std::shared_ptr<Session> player) const;
 
 private:
     std::vector<std::shared_ptr<Room>> rooms_;

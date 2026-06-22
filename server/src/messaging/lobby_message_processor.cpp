@@ -59,7 +59,12 @@ void LobbyMessageProcessor::process_message(const std::string& json, std::shared
         } else if constexpr (std::is_same_v<T, pp::PlayerAction>) {
             spdlog::info("Player Action Message (Lobby Processor)");
 
-            session->send_response(pp::ServerMessage { pp::Error { 4, "Game not started yet" } });
+            auto room = lobby_->find_room_by_player(session);
+            if (room) {
+                room->on_player_action(session, concrete_msg.action, concrete_msg.amount);
+            } else {
+                session->send_response(pp::ServerMessage { pp::Error { 4, "Not in a room" } });
+            }
         }
     },
         msg);

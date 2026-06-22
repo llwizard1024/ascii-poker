@@ -97,3 +97,9 @@ std::shared_ptr<Room> Lobby::get_room(uint64_t id) const
 
     return it == rooms_.end() ? nullptr : *it;
 }
+
+std::shared_ptr<Room> Lobby::find_room_by_player(std::shared_ptr<Session> player) const
+{
+    auto it = player_rooms_.find(player);
+    return it != player_rooms_.end() ? it->second : nullptr;
+}
