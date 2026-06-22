@@ -8,6 +8,7 @@ add_library(poker_server_lib STATIC
     src/game/room.cpp
     src/game/lobby.cpp
     src/game/remote_player.cpp
+    src/game/game_session.cpp
 )
 
 target_include_directories(poker_server_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
