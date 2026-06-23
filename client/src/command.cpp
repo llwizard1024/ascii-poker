@@ -1,5 +1,7 @@
 #include "command.h"
 
+namespace poker::client {
+
 Command CommandParser::parse(const std::string& input)
 {
     std::vector<std::string> tokens = split_input(input);
@@ -57,9 +59,13 @@ Command::Type CommandParser::type_from_string(const std::string& token)
         return Command::Type::LeaveRoom;
     if (clean == "list_rooms")
         return Command::Type::ListRooms;
+    if (clean == "start_game")
+        return Command::Type::StartGame;
     if (clean == "action")
         return Command::Type::PlayerAction;
     if (clean == "quit")
         return Command::Type::Quit;
     return Command::Type::Unknown;
 }
+
+} // namespace poker::client

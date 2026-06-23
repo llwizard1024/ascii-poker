@@ -1,6 +1,7 @@
-#include "session.h"
+#include "network/session.h"
 
-#include "poker/network_limits.h"
+#include "messaging/i_message_processor.h"
+#include "poker/packet_framing.h"
 #include "poker/protocol.h"
 
 #include <json/json.hpp>
@@ -10,16 +11,20 @@
 #include <asio/read.hpp>
 #include <asio/write.hpp>
 
-#include <netinet/in.h>
-#include <variant>
+namespace poker::server {
 
 namespace pp = poker::protocol;
 
-Session::Session(asio::ip::tcp::socket socket, std::shared_ptr<IMessageProcessor> processor, const std::string& player_name)
+Session::Session(asio::ip::tcp::socket socket, std::shared_ptr<IMessageProcessor> processor)
     : socket_(std::move(socket))
     , processor_(std::move(processor))
-    , player_name_(player_name)
 {
+}
+
+void Session::set_player_name(std::string name)
+{
+    player_name_ = std::move(name);
+    authenticated_ = true;
 }
 
 Session::~Session()
@@ -30,42 +35,53 @@ Session::~Session()
     }
 }
 
-void Session::send_response(const pp::ServerMessage& msg)
+void Session::send(const pp::ServerMessage& msg)
 {
-    std::string json_str = nlohmann::json(msg).dump();
-    uint32_t length = static_cast<uint32_t>(json_str.size());
+    if (closed_) {
+        return;
+    }
 
-    std::vector<uint8_t> packet;
-    packet.reserve(sizeof(length) + length);
+    const std::string json_str = nlohmann::json(msg).dump();
+    if (json_str.size() > poker::network::MAX_PACKET_SIZE) {
+        spdlog::error("Message too large to send");
+        return;
+    }
 
-    uint32_t network_length = htonl(length);
-
-    const uint8_t* length_bytes = reinterpret_cast<const uint8_t*>(&network_length);
-
-    packet.insert(packet.end(), length_bytes, length_bytes + sizeof(network_length));
-    packet.insert(packet.end(), json_str.begin(), json_str.end());
-
-    bool write_in_progress = !write_queue_.empty();
+    auto packet = poker::network::encode_packet(json_str);
 
     write_queue_.push_back(std::move(packet));
 
-    if (!write_in_progress) {
+    if (!write_in_progress_) {
         do_write();
     }
 }
 
 void Session::do_write()
 {
+    if (closed_ || write_in_progress_ || write_queue_.empty()) {
+        return;
+    }
+
+    write_in_progress_ = true;
     auto self = shared_from_this();
+    auto packet = std::make_shared<std::vector<uint8_t>>(write_queue_.front());
 
     asio::async_write(
         socket_,
-        asio::buffer(write_queue_.front().data(), write_queue_.front().size()),
-        [this, self](const std::error_code& ec, std::size_t bytes_transferred) {
+        asio::buffer(*packet),
+        [this, self, packet](const std::error_code& ec, std::size_t bytes_transferred) {
+            write_in_progress_ = false;
+
+            if (closed_) {
+                return;
+            }
+
             if (!ec) {
                 spdlog::debug("Response successfully sent. Bytes: {}", bytes_transferred);
 
-                write_queue_.pop_front();
+                if (!write_queue_.empty()) {
+                    write_queue_.pop_front();
+                }
 
                 if (!write_queue_.empty()) {
                     do_write();
@@ -84,18 +100,24 @@ void Session::start()
 
 void Session::do_read_header()
 {
+    if (closed_) {
+        return;
+    }
+
     auto self = shared_from_this();
     asio::async_read(
         socket_,
         asio::buffer(header_buffer_, 4),
         asio::transfer_exactly(4),
         [this, self](const std::error_code& ec, std::size_t bytes_transferred) {
+            if (closed_) {
+                return;
+            }
+
             if (!ec && bytes_transferred == 4) {
-                uint32_t network_length;
-                std::memcpy(&network_length, header_buffer_.data(), sizeof(network_length));
-                uint32_t length = ntohl(network_length);
-                if (length == 0 || length > poker::network::MAX_PACKET_SIZE) {
-                    spdlog::warn("Invalid packet size: {}. Closing session.", length);
+                uint32_t length = 0;
+                if (!poker::network::decode_packet_length(header_buffer_.data(), length)) {
+                    spdlog::warn("Invalid packet size. Closing session.");
                     close_session();
                     return;
                 }
@@ -110,11 +132,20 @@ void Session::do_read_header()
 
 void Session::do_read_body(uint32_t length)
 {
+    if (closed_) {
+        return;
+    }
+
     auto self = shared_from_this();
     asio::async_read(
         socket_,
         asio::buffer(body_buffer_, length),
+        asio::transfer_exactly(length),
         [this, self](const std::error_code& ec, std::size_t) {
+            if (closed_) {
+                return;
+            }
+
             if (!ec) {
                 on_message(body_buffer_);
                 do_read_header();
@@ -131,9 +162,11 @@ void Session::on_message(const std::string& json)
 
 void Session::close_session()
 {
-    if (!socket_.is_open()) {
+    if (closed_) {
         return;
     }
+
+    closed_ = true;
 
     if (processor_ && !disconnect_notified_) {
         disconnect_notified_ = true;
@@ -141,11 +174,12 @@ void Session::close_session()
     }
 
     std::error_code ec;
-    socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-
-    socket_.close(ec);
-
-    write_queue_.clear();
+    if (socket_.is_open()) {
+        socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        socket_.close(ec);
+    }
 
     spdlog::info("Session successfully closed and cleaned up.");
 }
+
+} // namespace poker::server

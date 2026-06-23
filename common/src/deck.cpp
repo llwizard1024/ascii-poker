@@ -23,7 +23,7 @@ void Deck::shuffle()
 std::vector<Card> Deck::deal(size_t count)
 {
     if (count > m_cards.size()) {
-        throw std::out_of_range("В колоде недостаточно карт для раздачи");
+        throw std::out_of_range("Not enough cards in deck to deal");
     }
 
     std::vector<Card> dealt_cards;

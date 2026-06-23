@@ -1,7 +1,27 @@
 #include "poker/protocol.h"
 
 namespace poker::protocol {
-// Client messages
+
+Error make_error(ErrorCode code, std::string detail)
+{
+    std::string description = std::string(error_code_message(code));
+    if (!detail.empty()) {
+        description += ": ";
+        description += detail;
+    }
+    return Error { static_cast<int>(code), std::move(description) };
+}
+
+void to_json(nlohmann::json& j, const Hello& msg)
+{
+    j = nlohmann::json { { "player_name", msg.player_name } };
+}
+
+void from_json(const nlohmann::json& j, Hello& msg)
+{
+    j.at("player_name").get_to(msg.player_name);
+}
+
 void to_json(nlohmann::json& j, const CreateRoom& msg)
 {
     j = nlohmann::json { { "room_name", msg.room_name }, { "max_players", msg.max_players } };
@@ -43,6 +63,16 @@ void from_json(const nlohmann::json&, ListRooms&)
     // empty
 }
 
+void to_json(nlohmann::json& j, const StartGame&)
+{
+    j = nlohmann::json::object();
+}
+
+void from_json(const nlohmann::json&, StartGame&)
+{
+    // empty
+}
+
 void to_json(nlohmann::json& j, const PlayerAction& msg)
 {
     j = nlohmann::json { { "action", msg.action } };
@@ -66,13 +96,24 @@ void from_json(const nlohmann::json& j, PlayerAction& msg)
 
 // Server messages
 
+void to_json(nlohmann::json& j, const Welcome& msg)
+{
+    j = nlohmann::json { { "player_name", msg.player_name } };
+}
+
+void from_json(const nlohmann::json& j, Welcome& msg)
+{
+    j.at("player_name").get_to(msg.player_name);
+}
+
 void to_json(nlohmann::json& j, const RoomInfo& msg)
 {
     j = nlohmann::json {
         { "room_id", msg.room_id },
         { "room_name", msg.room_name },
         { "current_players", msg.current_players },
-        { "max_players", msg.max_players }
+        { "max_players", msg.max_players },
+        { "in_game", msg.in_game }
     };
 }
 
@@ -82,6 +123,11 @@ void from_json(const nlohmann::json& j, RoomInfo& msg)
     j.at("room_name").get_to(msg.room_name);
     j.at("current_players").get_to(msg.current_players);
     j.at("max_players").get_to(msg.max_players);
+    if (j.contains("in_game")) {
+        j.at("in_game").get_to(msg.in_game);
+    } else {
+        msg.in_game = false;
+    }
 }
 
 void to_json(nlohmann::json& j, const RoomList& msg)
@@ -96,13 +142,20 @@ void from_json(const nlohmann::json& j, RoomList& msg)
 
 void to_json(nlohmann::json& j, const JoinedRoom& msg)
 {
-    j = nlohmann::json { { "room_id", msg.room_id }, { "player_names", msg.player_names } };
+    j = nlohmann::json {
+        { "room_id", msg.room_id },
+        { "player_names", msg.player_names },
+        { "host_name", msg.host_name },
+        { "max_players", msg.max_players }
+    };
 }
 
 void from_json(const nlohmann::json& j, JoinedRoom& msg)
 {
     j.at("room_id").get_to(msg.room_id);
     j.at("player_names").get_to(msg.player_names);
+    j.at("host_name").get_to(msg.host_name);
+    j.at("max_players").get_to(msg.max_players);
 }
 
 void to_json(nlohmann::json& j, const GameStateUpdate& msg)
@@ -181,7 +234,9 @@ void to_json(nlohmann::json& j, const ClientMessage& msg)
 {
     std::visit([&j](const auto& concrete) {
         using T = std::decay_t<decltype(concrete)>;
-        if constexpr (std::is_same_v<T, CreateRoom>) {
+        if constexpr (std::is_same_v<T, Hello>) {
+            j["type"] = "hello";
+        } else if constexpr (std::is_same_v<T, CreateRoom>) {
             j["type"] = "create_room";
         } else if constexpr (std::is_same_v<T, JoinRoom>) {
             j["type"] = "join_room";
@@ -189,6 +244,8 @@ void to_json(nlohmann::json& j, const ClientMessage& msg)
             j["type"] = "leave_room";
         } else if constexpr (std::is_same_v<T, ListRooms>) {
             j["type"] = "list_rooms";
+        } else if constexpr (std::is_same_v<T, StartGame>) {
+            j["type"] = "start_game";
         } else if constexpr (std::is_same_v<T, PlayerAction>) {
             j["type"] = "player_action";
         }
@@ -200,7 +257,9 @@ void to_json(nlohmann::json& j, const ClientMessage& msg)
 void from_json(const nlohmann::json& j, ClientMessage& msg)
 {
     const auto type = j.at("type").get<std::string>();
-    if (type == "create_room") {
+    if (type == "hello") {
+        msg = j.at("data").get<Hello>();
+    } else if (type == "create_room") {
         msg = j.at("data").get<CreateRoom>();
     } else if (type == "join_room") {
         msg = j.at("data").get<JoinRoom>();
@@ -208,6 +267,8 @@ void from_json(const nlohmann::json& j, ClientMessage& msg)
         msg = j.at("data").get<LeaveRoom>();
     } else if (type == "list_rooms") {
         msg = j.at("data").get<ListRooms>();
+    } else if (type == "start_game") {
+        msg = j.at("data").get<StartGame>();
     } else if (type == "player_action") {
         msg = j.at("data").get<PlayerAction>();
     } else {
@@ -219,7 +280,9 @@ void to_json(nlohmann::json& j, const ServerMessage& msg)
 {
     std::visit([&j](const auto& concrete) {
         using T = std::decay_t<decltype(concrete)>;
-        if constexpr (std::is_same_v<T, RoomList>) {
+        if constexpr (std::is_same_v<T, Welcome>) {
+            j["type"] = "welcome";
+        } else if constexpr (std::is_same_v<T, RoomList>) {
             j["type"] = "room_list";
         } else if constexpr (std::is_same_v<T, JoinedRoom>) {
             j["type"] = "joined_room";
@@ -242,7 +305,9 @@ void to_json(nlohmann::json& j, const ServerMessage& msg)
 void from_json(const nlohmann::json& j, ServerMessage& msg)
 {
     const auto type = j.at("type").get<std::string>();
-    if (type == "room_list") {
+    if (type == "welcome") {
+        msg = j.at("data").get<Welcome>();
+    } else if (type == "room_list") {
         msg = j.at("data").get<RoomList>();
     } else if (type == "joined_room") {
         msg = j.at("data").get<JoinedRoom>();

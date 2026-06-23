@@ -1,6 +1,7 @@
 #pragma once
 
 #include "poker/card.h"
+#include "poker/error_codes.h"
 
 #include <cstdint>
 #include <json/json.hpp>
@@ -125,6 +126,12 @@ enum class GamePhase {
 NLOHMANN_JSON_SERIALIZE_ENUM(GamePhase, { { GamePhase::PreFlop, "preflop" }, { GamePhase::Flop, "flop" }, { GamePhase::Turn, "turn" }, { GamePhase::River, "river" }, { GamePhase::Showdown, "showdown" } })
 
 // Client Messages
+struct Hello {
+    std::string player_name;
+};
+void to_json(nlohmann::json& j, const Hello& msg);
+void from_json(const nlohmann::json& j, Hello& msg);
+
 struct CreateRoom {
     std::string room_name;
     uint8_t max_players;
@@ -146,6 +153,10 @@ struct ListRooms { };
 void to_json(nlohmann::json& j, const ListRooms& msg);
 void from_json(const nlohmann::json& j, ListRooms& msg);
 
+struct StartGame { };
+void to_json(nlohmann::json& j, const StartGame& msg);
+void from_json(const nlohmann::json& j, StartGame& msg);
+
 struct PlayerAction {
     Action action;
     std::optional<uint32_t> amount;
@@ -154,11 +165,18 @@ void to_json(nlohmann::json& j, const PlayerAction& msg);
 void from_json(const nlohmann::json& j, PlayerAction& msg);
 
 // Server Messages
+struct Welcome {
+    std::string player_name;
+};
+void to_json(nlohmann::json& j, const Welcome& msg);
+void from_json(const nlohmann::json& j, Welcome& msg);
+
 struct RoomInfo {
     uint64_t room_id;
     std::string room_name;
     uint8_t current_players;
     uint8_t max_players;
+    bool in_game = false;
 };
 void to_json(nlohmann::json& j, const RoomInfo& msg);
 void from_json(const nlohmann::json& j, RoomInfo& msg);
@@ -172,6 +190,8 @@ void from_json(const nlohmann::json& j, RoomList& msg);
 struct JoinedRoom {
     uint64_t room_id;
     std::vector<std::string> player_names;
+    std::string host_name;
+    uint8_t max_players;
 };
 void to_json(nlohmann::json& j, const JoinedRoom& msg);
 void from_json(const nlohmann::json& j, JoinedRoom& msg);
@@ -198,6 +218,7 @@ struct Error {
     int code;
     std::string description;
 };
+Error make_error(ErrorCode code, std::string detail = {});
 void to_json(nlohmann::json& j, const Error& msg);
 void from_json(const nlohmann::json& j, Error& msg);
 
@@ -214,11 +235,11 @@ struct HandResult {
 void to_json(nlohmann::json& j, const HandResult& msg);
 void from_json(const nlohmann::json& j, HandResult& msg);
 
-using ClientMessage = std::variant<CreateRoom, JoinRoom, LeaveRoom, ListRooms, PlayerAction>;
+using ClientMessage = std::variant<Hello, CreateRoom, JoinRoom, LeaveRoom, ListRooms, StartGame, PlayerAction>;
 void to_json(nlohmann::json& j, const ClientMessage& msg);
 void from_json(const nlohmann::json& j, ClientMessage& msg);
 
-using ServerMessage = std::variant<RoomList, JoinedRoom, GameStateUpdate, YourTurn, Error, LeftRoom, HandResult>;
+using ServerMessage = std::variant<Welcome, RoomList, JoinedRoom, GameStateUpdate, YourTurn, Error, LeftRoom, HandResult>;
 void to_json(nlohmann::json& j, const ServerMessage& msg);
 void from_json(const nlohmann::json& j, ServerMessage& msg);
 }

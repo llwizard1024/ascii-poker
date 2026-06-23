@@ -1,18 +1,22 @@
-#include "remote_player.h"
+#include "game/remote_player.h"
 
-#include "../network/session.h"
+namespace poker::server {
 
-RemotePlayer::RemotePlayer(std::shared_ptr<Session> session)
-    : session_(std::move(session))
+RemotePlayer::RemotePlayer(ConnectionPtr connection)
+    : connection_(std::move(connection))
 {
 }
 
 void RemotePlayer::send_message(const poker::protocol::ServerMessage& msg)
 {
-    session_->send_response(msg);
+    if (connection_ && connection_->is_connected()) {
+        connection_->send(msg);
+    }
 }
 
 std::string RemotePlayer::get_name() const
 {
-    return session_->get_name();
+    return connection_->get_name();
 }
+
+} // namespace poker::server

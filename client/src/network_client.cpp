@@ -7,10 +7,12 @@
 #include <asio/write.hpp>
 
 #include <json/json.hpp>
-#include <poker/network_limits.h>
+#include <poker/packet_framing.h>
 #include <spdlog/spdlog.h>
 
 #include <variant>
+
+namespace poker::client {
 
 namespace pp = poker::protocol;
 
@@ -41,6 +43,7 @@ NetworkClient::NetworkClient(asio::io_context& io, const std::string& host, cons
 
 NetworkClient::~NetworkClient()
 {
+    closed_ = true;
     if (socket_.is_open()) {
         std::error_code ec;
         socket_.close(ec);
@@ -59,18 +62,24 @@ void NetworkClient::start()
 
 void NetworkClient::do_read_header()
 {
+    if (closed_) {
+        return;
+    }
+
     auto self = shared_from_this();
     asio::async_read(
         socket_,
         asio::buffer(header_buffer_, 4),
         asio::transfer_exactly(4),
         [this, self](const std::error_code& ec, std::size_t bytes_transferred) {
+            if (closed_) {
+                return;
+            }
+
             if (!ec && bytes_transferred == 4) {
-                uint32_t network_length;
-                std::memcpy(&network_length, header_buffer_.data(), sizeof(network_length));
-                uint32_t length = ntohl(network_length);
-                if (length == 0 || length > poker::network::MAX_PACKET_SIZE) {
-                    spdlog::warn("Invalid packet size: {}. Closing connection.", length);
+                uint32_t length = 0;
+                if (!poker::network::decode_packet_length(header_buffer_.data(), length)) {
+                    spdlog::warn("Invalid packet size. Closing connection.");
                     close_connection();
                     return;
                 }
@@ -85,11 +94,20 @@ void NetworkClient::do_read_header()
 
 void NetworkClient::do_read_body(uint32_t length)
 {
+    if (closed_) {
+        return;
+    }
+
     auto self = shared_from_this();
     asio::async_read(
         socket_,
         asio::buffer(body_buffer_, length),
+        asio::transfer_exactly(length),
         [this, self](const std::error_code& ec, std::size_t) {
+            if (closed_) {
+                return;
+            }
+
             if (!ec) {
                 on_message(body_buffer_);
                 do_read_header();
@@ -119,26 +137,6 @@ void NetworkClient::on_message(const std::string& json)
         return;
     }
 
-    std::visit([](const auto& concrete_msg) {
-        using T = std::decay_t<decltype(concrete_msg)>;
-        if constexpr (std::is_same_v<T, pp::RoomList>) {
-            spdlog::info("Room List Message");
-        } else if constexpr (std::is_same_v<T, pp::JoinedRoom>) {
-            spdlog::info("Joined Room Message");
-        } else if constexpr (std::is_same_v<T, pp::GameStateUpdate>) {
-            spdlog::info("Game State Update Message");
-        } else if constexpr (std::is_same_v<T, pp::YourTurn>) {
-            spdlog::info("Your Turn Message");
-        } else if constexpr (std::is_same_v<T, pp::Error>) {
-            spdlog::info("Error Message");
-        } else if constexpr (std::is_same_v<T, pp::LeftRoom>) {
-            spdlog::info("Left Room Message");
-        } else if constexpr (std::is_same_v<T, pp::HandResult>) {
-            spdlog::info("Hand Result Message");
-        }
-    },
-        msg);
-
     try {
         if (handler_) {
             handler_(msg);
@@ -150,29 +148,26 @@ void NetworkClient::on_message(const std::string& json)
 
 void NetworkClient::send(const pp::ClientMessage& msg)
 {
-    std::string json_str = nlohmann::json(msg).dump();
+    if (closed_) {
+        return;
+    }
+
+    const std::string json_str = nlohmann::json(msg).dump();
     if (json_str.size() > poker::network::MAX_PACKET_SIZE) {
         spdlog::error("Message too large to send");
         return;
     }
 
-    uint32_t length = static_cast<uint32_t>(json_str.size());
-
-    std::vector<uint8_t> packet;
-    packet.reserve(sizeof(length) + length);
-
-    uint32_t network_length = htonl(length);
-
-    const uint8_t* length_bytes = reinterpret_cast<const uint8_t*>(&network_length);
-
-    packet.insert(packet.end(), length_bytes, length_bytes + sizeof(network_length));
-    packet.insert(packet.end(), json_str.begin(), json_str.end());
+    auto packet = poker::network::encode_packet(json_str);
 
     auto self = shared_from_this();
     asio::post(socket_.get_executor(), [this, self, packet = std::move(packet)]() mutable {
-        bool write_in_progress = !write_queue_.empty();
+        if (closed_) {
+            return;
+        }
+
         write_queue_.push_back(std::move(packet));
-        if (!write_in_progress) {
+        if (!write_in_progress_) {
             do_write();
         }
     });
@@ -180,16 +175,30 @@ void NetworkClient::send(const pp::ClientMessage& msg)
 
 void NetworkClient::do_write()
 {
+    if (closed_ || write_in_progress_ || write_queue_.empty()) {
+        return;
+    }
+
+    write_in_progress_ = true;
     auto self = shared_from_this();
+    auto packet = std::make_shared<std::vector<uint8_t>>(write_queue_.front());
 
     asio::async_write(
         socket_,
-        asio::buffer(write_queue_.front().data(), write_queue_.front().size()),
-        [this, self](const std::error_code& ec, std::size_t bytes_transferred) {
+        asio::buffer(*packet),
+        [this, self, packet](const std::error_code& ec, std::size_t bytes_transferred) {
+            write_in_progress_ = false;
+
+            if (closed_) {
+                return;
+            }
+
             if (!ec) {
                 spdlog::debug("Response successfully sent. Bytes: {}", bytes_transferred);
 
-                write_queue_.pop_front();
+                if (!write_queue_.empty()) {
+                    write_queue_.pop_front();
+                }
 
                 if (!write_queue_.empty()) {
                     do_write();
@@ -203,16 +212,19 @@ void NetworkClient::do_write()
 
 void NetworkClient::close_connection()
 {
-    if (!socket_.is_open()) {
+    if (closed_) {
         return;
     }
 
+    closed_ = true;
+
     std::error_code ec;
-    socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
-
-    socket_.close(ec);
-
-    write_queue_.clear();
+    if (socket_.is_open()) {
+        socket_.shutdown(asio::ip::tcp::socket::shutdown_both, ec);
+        socket_.close(ec);
+    }
 
     spdlog::info("Connection successfully closed and cleaned up.");
 }
+
+} // namespace poker::client

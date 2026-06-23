@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build -j
+
+      - name: Unit tests
+        run: ./build/tests/poker_tests "~[integration]" --reporter compact
+
+      - name: Integration tests
+        run: ./build/tests/poker_tests "[integration]" --reporter compact
+
+      - name: Check formatting
+        run: bash scripts/check-format.sh
