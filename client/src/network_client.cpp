@@ -2,10 +2,12 @@
 
 #include <asio/buffer.hpp>
 #include <asio/connect.hpp>
+#include <asio/post.hpp>
 #include <asio/read.hpp>
 #include <asio/write.hpp>
 
 #include <json/json.hpp>
+#include <poker/network_limits.h>
 #include <spdlog/spdlog.h>
 
 #include <variant>
@@ -67,6 +69,11 @@ void NetworkClient::do_read_header()
                 uint32_t network_length;
                 std::memcpy(&network_length, header_buffer_.data(), sizeof(network_length));
                 uint32_t length = ntohl(network_length);
+                if (length == 0 || length > poker::network::MAX_PACKET_SIZE) {
+                    spdlog::warn("Invalid packet size: {}. Closing connection.", length);
+                    close_connection();
+                    return;
+                }
                 body_buffer_.resize(length);
                 do_read_body(length);
             } else {
@@ -124,6 +131,10 @@ void NetworkClient::on_message(const std::string& json)
             spdlog::info("Your Turn Message");
         } else if constexpr (std::is_same_v<T, pp::Error>) {
             spdlog::info("Error Message");
+        } else if constexpr (std::is_same_v<T, pp::LeftRoom>) {
+            spdlog::info("Left Room Message");
+        } else if constexpr (std::is_same_v<T, pp::HandResult>) {
+            spdlog::info("Hand Result Message");
         }
     },
         msg);
@@ -140,6 +151,11 @@ void NetworkClient::on_message(const std::string& json)
 void NetworkClient::send(const pp::ClientMessage& msg)
 {
     std::string json_str = nlohmann::json(msg).dump();
+    if (json_str.size() > poker::network::MAX_PACKET_SIZE) {
+        spdlog::error("Message too large to send");
+        return;
+    }
+
     uint32_t length = static_cast<uint32_t>(json_str.size());
 
     std::vector<uint8_t> packet;
@@ -152,13 +168,14 @@ void NetworkClient::send(const pp::ClientMessage& msg)
     packet.insert(packet.end(), length_bytes, length_bytes + sizeof(network_length));
     packet.insert(packet.end(), json_str.begin(), json_str.end());
 
-    bool write_in_progress = !write_queue_.empty();
-
-    write_queue_.push_back(std::move(packet));
-
-    if (!write_in_progress) {
-        do_write();
-    }
+    auto self = shared_from_this();
+    asio::post(socket_.get_executor(), [this, self, packet = std::move(packet)]() mutable {
+        bool write_in_progress = !write_queue_.empty();
+        write_queue_.push_back(std::move(packet));
+        if (!write_in_progress) {
+            do_write();
+        }
+    });
 }
 
 void NetworkClient::do_write()

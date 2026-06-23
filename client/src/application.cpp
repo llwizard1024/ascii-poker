@@ -45,6 +45,9 @@ void ClientApplication::process_input(const std::string& line)
     case Command::Type::LeaveRoom:
         leave_room();
         return;
+    case Command::Type::ListRooms:
+        list_rooms();
+        return;
     case Command::Type::PlayerAction:
         player_action(cmd);
         return;
@@ -68,8 +71,8 @@ void ClientApplication::create_room(const Command& cmd)
 
     auto parsed_value = to_uint32(arg);
 
-    if (!parsed_value.has_value() || parsed_value.value() > 255) {
-        spdlog::error("Failed to parse max_players: invalid argument or value out of range (0-255). Got: '{}'", arg);
+    if (!parsed_value.has_value() || parsed_value.value() < 2 || parsed_value.value() > 255) {
+        spdlog::error("Failed to parse max_players: must be between 2 and 255. Got: '{}'", arg);
         return;
     }
 
@@ -105,6 +108,13 @@ void ClientApplication::leave_room()
     client_->send(pp::ClientMessage { pp::LeaveRoom {} });
 
     spdlog::info("Sending LeaveRoom");
+}
+
+void ClientApplication::list_rooms()
+{
+    client_->send(pp::ClientMessage { pp::ListRooms {} });
+
+    spdlog::info("Sending ListRooms");
 }
 
 void ClientApplication::player_action(const Command& cmd)

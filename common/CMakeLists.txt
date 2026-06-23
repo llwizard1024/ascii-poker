@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(poker_core STATIC
     src/card.cpp
     src/deck.cpp
+    src/hand_evaluator.cpp
     src/protocol.cpp
 )
 

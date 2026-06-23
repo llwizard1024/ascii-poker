@@ -10,6 +10,7 @@ public:
     explicit LobbyMessageProcessor(std::shared_ptr<Lobby> lobby);
     ~LobbyMessageProcessor() override;
     void process_message(const std::string& json, std::shared_ptr<Session> session) override;
+    void on_disconnect(std::shared_ptr<Session> session) override;
 
 private:
     std::shared_ptr<Lobby> lobby_;

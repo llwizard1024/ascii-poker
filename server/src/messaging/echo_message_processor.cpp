@@ -41,6 +41,8 @@ void EchoMessageProcessor::process_message(const std::string& json, std::shared_
             spdlog::info("Join Room Message");
         } else if constexpr (std::is_same_v<T, pp::LeaveRoom>) {
             spdlog::info("Leave Room Message");
+        } else if constexpr (std::is_same_v<T, pp::ListRooms>) {
+            spdlog::info("List Rooms Message");
         } else if constexpr (std::is_same_v<T, pp::PlayerAction>) {
             spdlog::info("Player Action Message");
         }

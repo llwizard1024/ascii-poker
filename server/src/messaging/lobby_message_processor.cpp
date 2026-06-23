@@ -43,6 +43,12 @@ void LobbyMessageProcessor::process_message(const std::string& json, std::shared
         if constexpr (std::is_same_v<T, pp::CreateRoom>) {
             spdlog::info("Create Room Message (Lobby Processor)");
 
+            if (concrete_msg.max_players < 2) {
+                session->send_response(pp::ServerMessage {
+                    pp::Error { 9, "max_players must be at least 2" } });
+                return;
+            }
+
             lobby_->create_room(concrete_msg.room_name, concrete_msg.max_players, session);
         } else if constexpr (std::is_same_v<T, pp::JoinRoom>) {
             spdlog::info("Join Room Message (Lobby Processor)");
@@ -54,8 +60,14 @@ void LobbyMessageProcessor::process_message(const std::string& json, std::shared
         } else if constexpr (std::is_same_v<T, pp::LeaveRoom>) {
             spdlog::info("Leave Room Message (Lobby Processor)");
 
+            auto room = lobby_->find_room_by_player(session);
+            const uint64_t room_id = room ? room->get_id() : 0;
             lobby_->leave_room(session);
-            session->send_response(pp::ServerMessage { pp::Error { 0, "Left room" } });
+            session->send_response(pp::ServerMessage { pp::LeftRoom { room_id } });
+        } else if constexpr (std::is_same_v<T, pp::ListRooms>) {
+            spdlog::info("List Rooms Message (Lobby Processor)");
+
+            session->send_response(pp::ServerMessage { lobby_->get_room_list() });
         } else if constexpr (std::is_same_v<T, pp::PlayerAction>) {
             spdlog::info("Player Action Message (Lobby Processor)");
 
@@ -68,4 +80,10 @@ void LobbyMessageProcessor::process_message(const std::string& json, std::shared
         }
     },
         msg);
+}
+
+void LobbyMessageProcessor::on_disconnect(std::shared_ptr<Session> session)
+{
+    spdlog::info("Client disconnected: {}", session->get_name());
+    lobby_->leave_room(session);
 }

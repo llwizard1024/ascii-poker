@@ -6,6 +6,11 @@
 
 std::shared_ptr<Room> Lobby::create_room(const std::string& name, uint8_t max_players, std::shared_ptr<Session> creator)
 {
+    if (max_players < 2) {
+        spdlog::warn("Cannot create room: max_players must be at least 2");
+        return nullptr;
+    }
+
     auto player_rooms_it = player_rooms_.find(creator);
 
     if (player_rooms_it != player_rooms_.end()) {

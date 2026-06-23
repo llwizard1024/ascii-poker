@@ -31,4 +31,5 @@ private:
     std::deque<std::vector<uint8_t>> write_queue_;
     std::shared_ptr<IMessageProcessor> processor_;
     std::string player_name_;
+    bool disconnect_notified_ = false;
 };

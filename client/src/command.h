@@ -5,7 +5,7 @@
 
 struct Command {
     // clang-format off
-    enum class Type { CreateRoom, JoinRoom, LeaveRoom, PlayerAction, Quit, Unknown };
+    enum class Type { CreateRoom, JoinRoom, LeaveRoom, ListRooms, PlayerAction, Quit, Unknown };
     // clang-format on
     Type type;
     std::vector<std::string> args;

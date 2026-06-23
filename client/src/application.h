@@ -25,6 +25,7 @@ private:
     void create_room(const Command& cmd);
     void join_room(const Command& cmd);
     void leave_room();
+    void list_rooms();
     void player_action(const Command& cmd);
     void quit();
     void unknown(const Command& cmd);

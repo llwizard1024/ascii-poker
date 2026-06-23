@@ -1,6 +1,7 @@
 #include "room.h"
 
 #include <algorithm>
+#include <unordered_map>
 
 #include <spdlog/spdlog.h>
 
@@ -43,6 +44,11 @@ bool Room::remove_player(std::shared_ptr<Session> player)
     if (it == players_.end()) {
         spdlog::warn("Player {} not found for remove action!", player->get_name());
         return false;
+    }
+
+    if (game_session_) {
+        game_session_->on_player_disconnect(player);
+        game_session_.reset();
     }
 
     players_.erase(it);
@@ -97,10 +103,13 @@ void Room::start_game()
         auto rp = std::make_shared<RemotePlayer>(session);
         game_players.push_back(rp);
     }
-    game_session_ = std::make_unique<GameSession>(game_players, id_);
+
+    std::unordered_map<Session*, IPlayer*> session_map;
     for (size_t i = 0; i < players_.size(); ++i) {
-        game_session_->session_map_[players_[i].get()] = game_players[i].get();
+        session_map[players_[i].get()] = game_players[i].get();
     }
+
+    game_session_ = std::make_unique<GameSession>(game_players, session_map, id_);
     game_session_->start();
 }
 

@@ -16,23 +16,38 @@
 
 class GameSession {
 public:
-    GameSession(std::vector<std::shared_ptr<IPlayer>> players, uint64_t room_id);
+    GameSession(
+        std::vector<std::shared_ptr<IPlayer>> players,
+        std::unordered_map<Session*, IPlayer*> session_map,
+        uint64_t room_id);
+
     void start();
-    void next_phase();
     void apply_action(std::shared_ptr<Session> session, poker::protocol::Action action, std::optional<uint32_t> amount);
+    void on_player_disconnect(std::shared_ptr<Session> session);
     void broadcast_state();
+
     IPlayer* get_player(Session* session) const;
-    std::unordered_map<Session*, IPlayer*> session_map_;
 
 private:
+    size_t count_active_players() const;
     size_t find_next_active_player() const;
     bool is_round_complete() const;
+    bool can_player_act(IPlayer* player) const;
     void ask_current_player();
     void advance_to_next_player();
+    void mark_all_in_if_needed(IPlayer* player);
+    void next_phase();
+    void do_showdown();
+    void award_pot(const std::vector<IPlayer*>& winners);
+    void broadcast_hand_result(const std::vector<std::string>& winner_names, uint32_t amount);
+    void handle_single_winner(IPlayer* winner);
+    void start_new_hand();
 
     std::vector<std::shared_ptr<IPlayer>> players_;
+    std::unordered_map<Session*, IPlayer*> session_map_;
     std::unordered_map<IPlayer*, std::vector<poker::Card>> hands_;
     std::unordered_set<IPlayer*> folded_players_;
+    std::unordered_set<IPlayer*> all_in_players_;
 
     uint64_t room_id_;
     poker::Deck deck_;

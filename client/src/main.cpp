@@ -1,48 +1,37 @@
 #include "network_client.h"
-
 #include "application.h"
+#include "poker_ui.h"
 #include "poker/protocol.h"
 
 #include <asio/io_context.hpp>
 #include <spdlog/spdlog.h>
-
-#include <iostream>
-#include <string>
 #include <thread>
+#include <atomic>
 
-int main()
-{
+int main() {
     spdlog::set_level(spdlog::level::info);
 
     try {
         asio::io_context io;
         auto client = std::make_shared<NetworkClient>(io, "127.0.0.1", "12345");
+        auto app = std::make_shared<ClientApplication>(client);
+        auto ui = std::make_shared<PokerUI>(app);
 
-        ClientApplication app(client);
-        client->set_message_handler([](const poker::protocol::ServerMessage& msg) {
-            spdlog::info("Server response: {}", nlohmann::json(msg).dump());
+        client->set_message_handler([ui](const poker::protocol::ServerMessage& msg) {
+            ui->add_server_message(msg);
         });
 
         client->start();
 
-        std::thread input_thread([&]() {
-            std::string line;
-            while (std::getline(std::cin, line)) {
-                app.process_input(line);
-                if (app.quit_requested()) {
-                    io.stop();
-                    break;
-                }
-            }
-        });
+        std::thread io_thread([&io]() { io.run(); });
 
-        io.run();
+        ui->run();
 
-        input_thread.join();
+        io.stop();
+        io_thread.join();
     } catch (const std::exception& e) {
-        spdlog::error("Fatal error: {}", e.what());
+        spdlog::critical("Fatal: {}", e.what());
         return 1;
     }
-
     return 0;
 }

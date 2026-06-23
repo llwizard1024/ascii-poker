@@ -33,6 +33,24 @@ TEST_CASE("LeaveRoom round-trip", "[protocol]")
     test_roundtrip(msg);
 }
 
+TEST_CASE("ListRooms round-trip", "[protocol]")
+{
+    ListRooms msg;
+    test_roundtrip(msg);
+}
+
+TEST_CASE("LeftRoom round-trip", "[protocol]")
+{
+    LeftRoom msg { 42 };
+    test_roundtrip(msg);
+}
+
+TEST_CASE("HandResult round-trip", "[protocol]")
+{
+    HandResult msg { { "Alice", "Bob" }, 1500 };
+    test_roundtrip(msg);
+}
+
 TEST_CASE("Error round-trip", "[protocol]")
 {
     Error msg { 404, "Room not found" };
@@ -159,6 +177,14 @@ TEST_CASE("ClientMessage serialization for all variants", "[protocol]")
         ClientMessage parsed = j.get<ClientMessage>();
         REQUIRE(nlohmann::json(msg) == nlohmann::json(parsed));
     }
+    SECTION("ListRooms")
+    {
+        ClientMessage msg = ListRooms {};
+        nlohmann::json j = msg;
+        REQUIRE(j["type"] == "list_rooms");
+        ClientMessage parsed = j.get<ClientMessage>();
+        REQUIRE(nlohmann::json(msg) == nlohmann::json(parsed));
+    }
     SECTION("PlayerAction")
     {
         ClientMessage msg = PlayerAction { Action::Raise, 100 };
@@ -216,6 +242,22 @@ TEST_CASE("ServerMessage serialization for all variants", "[protocol]")
         ServerMessage msg = Error { 1, "bad" };
         nlohmann::json j = msg;
         REQUIRE(j["type"] == "error");
+        ServerMessage parsed = j.get<ServerMessage>();
+        REQUIRE(nlohmann::json(msg) == nlohmann::json(parsed));
+    }
+    SECTION("LeftRoom")
+    {
+        ServerMessage msg = LeftRoom { 3 };
+        nlohmann::json j = msg;
+        REQUIRE(j["type"] == "left_room");
+        ServerMessage parsed = j.get<ServerMessage>();
+        REQUIRE(nlohmann::json(msg) == nlohmann::json(parsed));
+    }
+    SECTION("HandResult")
+    {
+        ServerMessage msg = HandResult { { "Winner" }, 900 };
+        nlohmann::json j = msg;
+        REQUIRE(j["type"] == "hand_result");
         ServerMessage parsed = j.get<ServerMessage>();
         REQUIRE(nlohmann::json(msg) == nlohmann::json(parsed));
     }

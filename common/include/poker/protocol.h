@@ -142,6 +142,10 @@ struct LeaveRoom { };
 void to_json(nlohmann::json& j, const LeaveRoom& msg);
 void from_json(const nlohmann::json& j, LeaveRoom& msg);
 
+struct ListRooms { };
+void to_json(nlohmann::json& j, const ListRooms& msg);
+void from_json(const nlohmann::json& j, ListRooms& msg);
+
 struct PlayerAction {
     Action action;
     std::optional<uint32_t> amount;
@@ -197,11 +201,24 @@ struct Error {
 void to_json(nlohmann::json& j, const Error& msg);
 void from_json(const nlohmann::json& j, Error& msg);
 
-using ClientMessage = std::variant<CreateRoom, JoinRoom, LeaveRoom, PlayerAction>;
+struct LeftRoom {
+    uint64_t room_id;
+};
+void to_json(nlohmann::json& j, const LeftRoom& msg);
+void from_json(const nlohmann::json& j, LeftRoom& msg);
+
+struct HandResult {
+    std::vector<std::string> winner_names;
+    uint32_t pot_amount;
+};
+void to_json(nlohmann::json& j, const HandResult& msg);
+void from_json(const nlohmann::json& j, HandResult& msg);
+
+using ClientMessage = std::variant<CreateRoom, JoinRoom, LeaveRoom, ListRooms, PlayerAction>;
 void to_json(nlohmann::json& j, const ClientMessage& msg);
 void from_json(const nlohmann::json& j, ClientMessage& msg);
 
-using ServerMessage = std::variant<RoomList, JoinedRoom, GameStateUpdate, YourTurn, Error>;
+using ServerMessage = std::variant<RoomList, JoinedRoom, GameStateUpdate, YourTurn, Error, LeftRoom, HandResult>;
 void to_json(nlohmann::json& j, const ServerMessage& msg);
 void from_json(const nlohmann::json& j, ServerMessage& msg);
 }

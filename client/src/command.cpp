@@ -55,6 +55,8 @@ Command::Type CommandParser::type_from_string(const std::string& token)
         return Command::Type::JoinRoom;
     if (clean == "leave_room")
         return Command::Type::LeaveRoom;
+    if (clean == "list_rooms")
+        return Command::Type::ListRooms;
     if (clean == "action")
         return Command::Type::PlayerAction;
     if (clean == "quit")

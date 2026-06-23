@@ -9,4 +9,5 @@ class IMessageProcessor {
 public:
     virtual ~IMessageProcessor() = default;
     virtual void process_message(const std::string& json, std::shared_ptr<Session> session) = 0;
+    virtual void on_disconnect(std::shared_ptr<Session> /*session*/) {}
 };

@@ -1,5 +1,6 @@
 #include "session.h"
 
+#include "poker/network_limits.h"
 #include "poker/protocol.h"
 
 #include <json/json.hpp>
@@ -93,6 +94,11 @@ void Session::do_read_header()
                 uint32_t network_length;
                 std::memcpy(&network_length, header_buffer_.data(), sizeof(network_length));
                 uint32_t length = ntohl(network_length);
+                if (length == 0 || length > poker::network::MAX_PACKET_SIZE) {
+                    spdlog::warn("Invalid packet size: {}. Closing session.", length);
+                    close_session();
+                    return;
+                }
                 body_buffer_.resize(length);
                 do_read_body(length);
             } else {
@@ -127,6 +133,11 @@ void Session::close_session()
 {
     if (!socket_.is_open()) {
         return;
+    }
+
+    if (processor_ && !disconnect_notified_) {
+        disconnect_notified_ = true;
+        processor_->on_disconnect(shared_from_this());
     }
 
     std::error_code ec;

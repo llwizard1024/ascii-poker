@@ -33,6 +33,16 @@ void from_json(const nlohmann::json&, LeaveRoom&)
     // empty
 }
 
+void to_json(nlohmann::json& j, const ListRooms&)
+{
+    j = nlohmann::json::object();
+}
+
+void from_json(const nlohmann::json&, ListRooms&)
+{
+    // empty
+}
+
 void to_json(nlohmann::json& j, const PlayerAction& msg)
 {
     j = nlohmann::json { { "action", msg.action } };
@@ -143,6 +153,30 @@ void from_json(const nlohmann::json& j, Error& msg)
     j.at("description").get_to(msg.description);
 }
 
+void to_json(nlohmann::json& j, const LeftRoom& msg)
+{
+    j = nlohmann::json { { "room_id", msg.room_id } };
+}
+
+void from_json(const nlohmann::json& j, LeftRoom& msg)
+{
+    j.at("room_id").get_to(msg.room_id);
+}
+
+void to_json(nlohmann::json& j, const HandResult& msg)
+{
+    j = nlohmann::json {
+        { "winner_names", msg.winner_names },
+        { "pot_amount", msg.pot_amount }
+    };
+}
+
+void from_json(const nlohmann::json& j, HandResult& msg)
+{
+    j.at("winner_names").get_to(msg.winner_names);
+    j.at("pot_amount").get_to(msg.pot_amount);
+}
+
 void to_json(nlohmann::json& j, const ClientMessage& msg)
 {
     std::visit([&j](const auto& concrete) {
@@ -153,6 +187,8 @@ void to_json(nlohmann::json& j, const ClientMessage& msg)
             j["type"] = "join_room";
         } else if constexpr (std::is_same_v<T, LeaveRoom>) {
             j["type"] = "leave_room";
+        } else if constexpr (std::is_same_v<T, ListRooms>) {
+            j["type"] = "list_rooms";
         } else if constexpr (std::is_same_v<T, PlayerAction>) {
             j["type"] = "player_action";
         }
@@ -170,6 +206,8 @@ void from_json(const nlohmann::json& j, ClientMessage& msg)
         msg = j.at("data").get<JoinRoom>();
     } else if (type == "leave_room") {
         msg = j.at("data").get<LeaveRoom>();
+    } else if (type == "list_rooms") {
+        msg = j.at("data").get<ListRooms>();
     } else if (type == "player_action") {
         msg = j.at("data").get<PlayerAction>();
     } else {
@@ -191,6 +229,10 @@ void to_json(nlohmann::json& j, const ServerMessage& msg)
             j["type"] = "your_turn";
         } else if constexpr (std::is_same_v<T, Error>) {
             j["type"] = "error";
+        } else if constexpr (std::is_same_v<T, LeftRoom>) {
+            j["type"] = "left_room";
+        } else if constexpr (std::is_same_v<T, HandResult>) {
+            j["type"] = "hand_result";
         }
         j["data"] = concrete;
     },
@@ -210,6 +252,10 @@ void from_json(const nlohmann::json& j, ServerMessage& msg)
         msg = j.at("data").get<YourTurn>();
     } else if (type == "error") {
         msg = j.at("data").get<Error>();
+    } else if (type == "left_room") {
+        msg = j.at("data").get<LeftRoom>();
+    } else if (type == "hand_result") {
+        msg = j.at("data").get<HandResult>();
     } else {
         throw std::invalid_argument("Unknown ServerMessage type: " + type);
     }
