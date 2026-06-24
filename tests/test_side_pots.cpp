@@ -50,6 +50,20 @@ TEST_CASE("Folded players contribute but are not eligible", "[side_pots]")
     REQUIRE(pots[0].eligible_player_indices == std::vector<size_t> { 1 });
 }
 
+TEST_CASE("One active player contributed while opponent has zero", "[side_pots]")
+{
+    const std::vector<PotPlayerState> players = {
+        { 20, false },
+        { 0, false },
+    };
+
+    const auto pots = compute_side_pots(players);
+
+    REQUIRE(pots.size() == 1);
+    REQUIRE(pots[0].amount == 20);
+    REQUIRE(pots[0].eligible_player_indices == std::vector<size_t> { 0, 1 });
+}
+
 TEST_CASE("Three active players with two contribution levels", "[side_pots]")
 {
     const std::vector<PotPlayerState> players = {

@@ -15,12 +15,23 @@ enum class UiScreen {
     Lobby,
     WaitingRoom,
     InGame,
+    Disconnected,
+};
+
+enum class ConnectionStatus {
+    Connecting,
+    Connected,
+    Failed,
+    Disconnected
 };
 
 struct ClientViewState {
     UiScreen screen = UiScreen::Login;
+    ConnectionStatus connection = ConnectionStatus::Connecting;
 
     std::string player_name;
+    std::string server_host;
+    std::string server_port;
 
     std::vector<poker::protocol::RoomInfo> rooms;
     std::optional<uint64_t> room_id;
@@ -38,9 +49,15 @@ struct ClientViewState {
 
     void append_log(std::string message);
     void apply_message(const poker::protocol::ServerMessage& msg);
+    void set_connection(ConnectionStatus status);
+    void reset_play_session();
+
+    bool has_action(poker::protocol::Action action) const;
+    std::string hand_hint() const;
 };
 
 std::string phase_to_string(poker::protocol::GamePhase phase);
 std::string action_to_string(poker::protocol::Action action);
+std::string connection_status_label(ConnectionStatus status);
 
 } // namespace poker::client

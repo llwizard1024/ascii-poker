@@ -25,10 +25,12 @@ std::vector<SidePot> compute_side_pots(const std::vector<PotPlayerState>& player
     while (!eligible.empty()) {
         uint32_t min_bet = std::numeric_limits<uint32_t>::max();
         for (const size_t index : eligible) {
-            min_bet = std::min(min_bet, remaining[index]);
+            if (remaining[index] > 0) {
+                min_bet = std::min(min_bet, remaining[index]);
+            }
         }
 
-        if (min_bet == 0 || min_bet == std::numeric_limits<uint32_t>::max()) {
+        if (min_bet == std::numeric_limits<uint32_t>::max()) {
             break;
         }
 

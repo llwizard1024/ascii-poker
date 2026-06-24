@@ -44,6 +44,8 @@ TEST_CASE("Two TCP clients can create a room and start a game", "[integration]")
 
     std::thread client_thread([&]() { client_io.run(); });
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
     alice->send(pp::ClientMessage { pp::Hello { "Alice" } });
     REQUIRE(alice_msgs.wait_for<pp::Welcome>(std::chrono::seconds(2)));
 

@@ -27,10 +27,12 @@ public:
     void apply_action(ConnectionPtr connection, poker::protocol::Action action, std::optional<uint32_t> amount);
     void remove_player(ConnectionPtr connection);
     void broadcast_state();
+    void broadcast_action_event(const std::string& player_name, poker::protocol::Action action, std::optional<uint32_t> amount);
 
     IPlayer* get_player(IConnection* connection) const;
     size_t player_count() const { return players_.size(); }
     bool has_enough_players() const { return players_.size() >= 2; }
+    size_t count_players_with_chips() const;
 
     uint32_t pot_total() const { return pot_; }
 
@@ -60,6 +62,7 @@ private:
     void erase_player_state(IPlayer* player, ConnectionPtr connection);
     void fix_indices_after_removal(size_t removed_index);
     void continue_after_player_left(bool was_current);
+    std::vector<poker::protocol::PlayerState> build_player_states(bool reveal_hole_cards) const;
 
     std::vector<std::shared_ptr<IPlayer>> players_;
     std::unordered_map<IConnection*, IPlayer*> connection_map_;

@@ -5,6 +5,10 @@ add_library(poker_client_lib STATIC
     src/command.cpp
     src/application.cpp
     src/client_view_state.cpp
+    src/client_settings.cpp
+    src/i18n.cpp
+    src/game_text.cpp
+    src/ui_cards.cpp
     src/poker_ui.cpp
 )
 

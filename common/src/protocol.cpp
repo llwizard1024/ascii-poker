@@ -146,7 +146,8 @@ void to_json(nlohmann::json& j, const JoinedRoom& msg)
         { "room_id", msg.room_id },
         { "player_names", msg.player_names },
         { "host_name", msg.host_name },
-        { "max_players", msg.max_players }
+        { "max_players", msg.max_players },
+        { "in_game", msg.in_game }
     };
 }
 
@@ -156,6 +157,37 @@ void from_json(const nlohmann::json& j, JoinedRoom& msg)
     j.at("player_names").get_to(msg.player_names);
     j.at("host_name").get_to(msg.host_name);
     j.at("max_players").get_to(msg.max_players);
+    if (j.contains("in_game")) {
+        j.at("in_game").get_to(msg.in_game);
+    } else {
+        msg.in_game = false;
+    }
+}
+
+void to_json(nlohmann::json& j, const PlayerState& msg)
+{
+    j = nlohmann::json {
+        { "name", msg.name },
+        { "chips", msg.chips },
+        { "round_bet", msg.round_bet },
+        { "folded", msg.folded },
+        { "all_in", msg.all_in },
+        { "hole_cards", msg.hole_cards }
+    };
+}
+
+void from_json(const nlohmann::json& j, PlayerState& msg)
+{
+    j.at("name").get_to(msg.name);
+    j.at("chips").get_to(msg.chips);
+    j.at("round_bet").get_to(msg.round_bet);
+    j.at("folded").get_to(msg.folded);
+    j.at("all_in").get_to(msg.all_in);
+    if (j.contains("hole_cards")) {
+        j.at("hole_cards").get_to(msg.hole_cards);
+    } else {
+        msg.hole_cards.clear();
+    }
 }
 
 void to_json(nlohmann::json& j, const GameStateUpdate& msg)
@@ -165,7 +197,9 @@ void to_json(nlohmann::json& j, const GameStateUpdate& msg)
         { "your_cards", msg.your_cards },
         { "phase", msg.phase },
         { "active_player_name", msg.active_player_name },
-        { "total_pot", msg.total_pot }
+        { "total_pot", msg.total_pot },
+        { "current_bet", msg.current_bet },
+        { "players", msg.players }
     };
 }
 
@@ -177,6 +211,16 @@ void from_json(const nlohmann::json& j, GameStateUpdate& msg)
     j.at("phase").get_to(msg.phase);
     j.at("active_player_name").get_to(msg.active_player_name);
     j.at("total_pot").get_to(msg.total_pot);
+    if (j.contains("current_bet")) {
+        j.at("current_bet").get_to(msg.current_bet);
+    } else {
+        msg.current_bet = 0;
+    }
+    if (j.contains("players")) {
+        j.at("players").get_to(msg.players);
+    } else {
+        msg.players.clear();
+    }
 }
 
 void to_json(nlohmann::json& j, const YourTurn& msg)
@@ -184,7 +228,9 @@ void to_json(nlohmann::json& j, const YourTurn& msg)
     j = nlohmann::json {
         { "available_actions", msg.available_actions },
         { "min_amount", msg.min_amount },
-        { "max_amount", msg.max_amount }
+        { "max_amount", msg.max_amount },
+        { "to_call", msg.to_call },
+        { "your_chips", msg.your_chips }
     };
 }
 
@@ -193,6 +239,40 @@ void from_json(const nlohmann::json& j, YourTurn& msg)
     j.at("available_actions").get_to(msg.available_actions);
     j.at("min_amount").get_to(msg.min_amount);
     j.at("max_amount").get_to(msg.max_amount);
+    if (j.contains("to_call")) {
+        j.at("to_call").get_to(msg.to_call);
+    } else {
+        msg.to_call = 0;
+    }
+    if (j.contains("your_chips")) {
+        j.at("your_chips").get_to(msg.your_chips);
+    } else {
+        msg.your_chips = 0;
+    }
+}
+
+void to_json(nlohmann::json& j, const ActionEvent& msg)
+{
+    j = nlohmann::json {
+        { "player_name", msg.player_name },
+        { "action", msg.action }
+    };
+    if (msg.amount.has_value()) {
+        j["amount"] = msg.amount.value();
+    } else {
+        j["amount"] = nullptr;
+    }
+}
+
+void from_json(const nlohmann::json& j, ActionEvent& msg)
+{
+    j.at("player_name").get_to(msg.player_name);
+    j.at("action").get_to(msg.action);
+    if (j.contains("amount") && !j["amount"].is_null()) {
+        msg.amount = j.at("amount").get<uint32_t>();
+    } else {
+        msg.amount = std::nullopt;
+    }
 }
 
 void to_json(nlohmann::json& j, const Error& msg)
@@ -296,6 +376,8 @@ void to_json(nlohmann::json& j, const ServerMessage& msg)
             j["type"] = "left_room";
         } else if constexpr (std::is_same_v<T, HandResult>) {
             j["type"] = "hand_result";
+        } else if constexpr (std::is_same_v<T, ActionEvent>) {
+            j["type"] = "action_event";
         }
         j["data"] = concrete;
     },
@@ -321,6 +403,8 @@ void from_json(const nlohmann::json& j, ServerMessage& msg)
         msg = j.at("data").get<LeftRoom>();
     } else if (type == "hand_result") {
         msg = j.at("data").get<HandResult>();
+    } else if (type == "action_event") {
+        msg = j.at("data").get<ActionEvent>();
     } else {
         throw std::invalid_argument("Unknown ServerMessage type: " + type);
     }

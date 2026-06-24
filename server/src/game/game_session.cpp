@@ -324,6 +324,8 @@ void GameSession::apply_action(ConnectionPtr connection, poker::protocol::Action
     } break;
     }
 
+    broadcast_action_event(current->get_name(), action, amount);
+
     if (count_active_players() == 1) {
         for (const auto& player : players_) {
             if (folded_players_.count(player.get()) == 0) {
@@ -343,6 +345,9 @@ void GameSession::apply_action(ConnectionPtr connection, poker::protocol::Action
 
 void GameSession::broadcast_state()
 {
+    const bool reveal = phase_ == poker::protocol::GamePhase::Showdown;
+    const auto player_states = build_player_states(reveal);
+
     for (const auto& player : players_) {
         poker::protocol::GameStateUpdate update;
         update.general_cards = community_cards_;
@@ -352,7 +357,46 @@ void GameSession::broadcast_state()
             update.active_player_name = players_[current_player_index_]->get_name();
         }
         update.total_pot = pot_;
+        update.current_bet = current_bet_;
+        update.players = player_states;
         player->send_message(poker::protocol::ServerMessage { update });
+    }
+}
+
+std::vector<poker::protocol::PlayerState> GameSession::build_player_states(bool reveal_hole_cards) const
+{
+    std::vector<poker::protocol::PlayerState> states;
+    states.reserve(players_.size());
+
+    for (const auto& player : players_) {
+        IPlayer* p = player.get();
+        poker::protocol::PlayerState state;
+        state.name = p->get_name();
+        state.chips = chips_.at(p);
+        state.round_bet = round_bets_.at(p);
+        state.folded = folded_players_.count(p) > 0;
+        state.all_in = all_in_players_.count(p) > 0;
+        if (reveal_hole_cards && !state.folded) {
+            state.hole_cards = hands_.at(p);
+        }
+        states.push_back(std::move(state));
+    }
+
+    return states;
+}
+
+void GameSession::broadcast_action_event(
+    const std::string& player_name,
+    poker::protocol::Action action,
+    std::optional<uint32_t> amount)
+{
+    poker::protocol::ActionEvent event;
+    event.player_name = player_name;
+    event.action = action;
+    event.amount = amount;
+
+    for (const auto& player : players_) {
+        player->send_message(poker::protocol::ServerMessage { event });
     }
 }
 
@@ -443,6 +487,8 @@ void GameSession::ask_current_player()
 
     turn.min_amount = min_raise_total;
     turn.max_amount = all_in_total;
+    turn.to_call = to_call;
+    turn.your_chips = chips_[current];
     current->send_message(poker::protocol::ServerMessage { turn });
 }
 
@@ -592,11 +638,28 @@ void GameSession::handle_single_winner(IPlayer* winner)
     try_start_new_hand();
 }
 
+size_t GameSession::count_players_with_chips() const
+{
+    size_t count = 0;
+    for (const auto& player : players_) {
+        const auto it = chips_.find(player.get());
+        if (it != chips_.end() && it->second > 0) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 void GameSession::try_start_new_hand()
 {
-    if (has_enough_players()) {
-        start_new_hand();
+    if (!has_enough_players()) {
+        return;
     }
+    if (count_players_with_chips() < 2) {
+        spdlog::info("Game over in room {} — fewer than two players with chips", room_id_);
+        return;
+    }
+    start_new_hand();
 }
 
 void GameSession::start_new_hand()

@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace poker {
@@ -34,5 +35,7 @@ inline uint8_t rank_value(Rank rank)
 
 HandValue evaluate_five(const std::array<Card, 5>& cards);
 HandValue evaluate_best(const std::vector<Card>& cards);
+
+std::string hand_category_label(HandCategory category);
 
 } // namespace poker

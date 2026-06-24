@@ -97,3 +97,32 @@ TEST_CASE("Minimum raise follows big blind increment after blinds", "[game_sessi
     REQUIRE(turn->min_amount == poker::BIG_BLIND + poker::BIG_BLIND);
     REQUIRE(poker::test::has_message<poker::protocol::YourTurn>(*alice_conn));
 }
+
+TEST_CASE("Heads-up all-in preflop completes and starts next hand", "[game_session]")
+{
+    auto alice_conn = std::make_shared<MockConnection>("Alice");
+    auto bob_conn = std::make_shared<MockConnection>("Bob");
+
+    GameSession session = make_session({ alice_conn, bob_conn });
+    session.start();
+
+    const auto alice_turn = find_message<poker::protocol::YourTurn>(*alice_conn);
+    REQUIRE(alice_turn.has_value());
+    session.apply_action(alice_conn, poker::protocol::Action::Raise, alice_turn->max_amount);
+
+    const auto bob_turn = find_message<poker::protocol::YourTurn>(*bob_conn);
+    REQUIRE(bob_turn.has_value());
+    session.apply_action(bob_conn, poker::protocol::Action::Call, std::nullopt);
+
+    REQUIRE(has_hand_result(*alice_conn));
+    REQUIRE(has_hand_result(*bob_conn));
+    REQUIRE(session.has_enough_players());
+
+    if (session.count_players_with_chips() >= 2) {
+        alice_conn->clear_messages();
+        bob_conn->clear_messages();
+        REQUIRE_NOTHROW(session.apply_action(alice_conn, poker::protocol::Action::Check, std::nullopt));
+    } else {
+        REQUIRE(session.count_players_with_chips() == 1);
+    }
+}

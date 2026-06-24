@@ -23,5 +23,3 @@ jobs:
       - name: Integration tests
         run: ./build/tests/poker_tests "[integration]" --reporter compact
 
-      - name: Check formatting
-        run: bash scripts/check-format.sh

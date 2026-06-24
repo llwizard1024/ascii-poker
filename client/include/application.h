@@ -29,6 +29,9 @@ public:
     void send_player_action(poker::protocol::Action action, std::optional<uint32_t> amount = std::nullopt);
     void quit();
 
+    bool is_connected() const;
+    void reconnect();
+
     bool quit_requested() const { return quit_flag_.load(); }
 
 private:

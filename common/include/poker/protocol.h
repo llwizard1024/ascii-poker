@@ -192,27 +192,51 @@ struct JoinedRoom {
     std::vector<std::string> player_names;
     std::string host_name;
     uint8_t max_players;
+    bool in_game = false;
 };
 void to_json(nlohmann::json& j, const JoinedRoom& msg);
 void from_json(const nlohmann::json& j, JoinedRoom& msg);
+
+struct PlayerState {
+    std::string name;
+    uint32_t chips = 0;
+    uint32_t round_bet = 0;
+    bool folded = false;
+    bool all_in = false;
+    std::vector<Card> hole_cards;
+};
+void to_json(nlohmann::json& j, const PlayerState& msg);
+void from_json(const nlohmann::json& j, PlayerState& msg);
 
 struct GameStateUpdate {
     std::vector<Card> general_cards;
     std::vector<Card> your_cards;
     GamePhase phase;
     std::string active_player_name;
-    uint32_t total_pot;
+    uint32_t total_pot = 0;
+    uint32_t current_bet = 0;
+    std::vector<PlayerState> players;
 };
 void to_json(nlohmann::json& j, const GameStateUpdate& msg);
 void from_json(const nlohmann::json& j, GameStateUpdate& msg);
 
 struct YourTurn {
     std::vector<Action> available_actions;
-    uint32_t min_amount;
-    uint32_t max_amount;
+    uint32_t min_amount = 0;
+    uint32_t max_amount = 0;
+    uint32_t to_call = 0;
+    uint32_t your_chips = 0;
 };
 void to_json(nlohmann::json& j, const YourTurn& msg);
 void from_json(const nlohmann::json& j, YourTurn& msg);
+
+struct ActionEvent {
+    std::string player_name;
+    Action action;
+    std::optional<uint32_t> amount;
+};
+void to_json(nlohmann::json& j, const ActionEvent& msg);
+void from_json(const nlohmann::json& j, ActionEvent& msg);
 
 struct Error {
     int code;
@@ -239,7 +263,7 @@ using ClientMessage = std::variant<Hello, CreateRoom, JoinRoom, LeaveRoom, ListR
 void to_json(nlohmann::json& j, const ClientMessage& msg);
 void from_json(const nlohmann::json& j, ClientMessage& msg);
 
-using ServerMessage = std::variant<Welcome, RoomList, JoinedRoom, GameStateUpdate, YourTurn, Error, LeftRoom, HandResult>;
+using ServerMessage = std::variant<Welcome, RoomList, JoinedRoom, GameStateUpdate, YourTurn, Error, LeftRoom, HandResult, ActionEvent>;
 void to_json(nlohmann::json& j, const ServerMessage& msg);
 void from_json(const nlohmann::json& j, ServerMessage& msg);
 }

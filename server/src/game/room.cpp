@@ -97,7 +97,8 @@ poker::protocol::JoinedRoom Room::make_joined_room_message() const
         id_,
         get_all_players_names(),
         host_->get_name(),
-        max_players_
+        max_players_,
+        game_session_ != nullptr
     };
 }
 

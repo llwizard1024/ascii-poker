@@ -112,7 +112,7 @@ TEST_CASE("RoomList with multiple rooms", "[protocol]")
 
 TEST_CASE("JoinedRoom with non‑empty player names", "[protocol]")
 {
-    JoinedRoom msg { 7, { "Alice", "Bob", "Charlie" }, "Alice", 6 };
+    JoinedRoom msg { 7, { "Alice", "Bob", "Charlie" }, "Alice", 6, false };
     test_roundtrip(msg);
 }
 
@@ -243,7 +243,7 @@ TEST_CASE("ServerMessage serialization for all variants", "[protocol]")
     }
     SECTION("JoinedRoom")
     {
-        ServerMessage msg = JoinedRoom { 5, { "X", "Y" }, "X", 4 };
+        ServerMessage msg = JoinedRoom { 5, { "X", "Y" }, "X", 4, false };
         nlohmann::json j = msg;
         REQUIRE(j["type"] == "joined_room");
         ServerMessage parsed = j.get<ServerMessage>();
@@ -294,6 +294,14 @@ TEST_CASE("ServerMessage serialization for all variants", "[protocol]")
         ServerMessage msg = HandResult { { "Winner" }, 900 };
         nlohmann::json j = msg;
         REQUIRE(j["type"] == "hand_result");
+        ServerMessage parsed = j.get<ServerMessage>();
+        REQUIRE(nlohmann::json(msg) == nlohmann::json(parsed));
+    }
+    SECTION("ActionEvent")
+    {
+        ServerMessage msg = ActionEvent { "Alice", Action::Raise, 120 };
+        nlohmann::json j = msg;
+        REQUIRE(j["type"] == "action_event");
         ServerMessage parsed = j.get<ServerMessage>();
         REQUIRE(nlohmann::json(msg) == nlohmann::json(parsed));
     }

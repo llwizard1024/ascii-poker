@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <string>
 
 namespace poker {
 namespace {
@@ -187,6 +188,31 @@ HandValue evaluate_best(const std::vector<Card>& cards)
     } while (next_combination(idx));
 
     return best;
+}
+
+std::string hand_category_label(HandCategory category)
+{
+    switch (category) {
+    case HandCategory::HighCard:
+        return "High card";
+    case HandCategory::OnePair:
+        return "Pair";
+    case HandCategory::TwoPair:
+        return "Two pair";
+    case HandCategory::ThreeOfKind:
+        return "Three of a kind";
+    case HandCategory::Straight:
+        return "Straight";
+    case HandCategory::Flush:
+        return "Flush";
+    case HandCategory::FullHouse:
+        return "Full house";
+    case HandCategory::FourOfKind:
+        return "Four of a kind";
+    case HandCategory::StraightFlush:
+        return "Straight flush";
+    }
+    return "Unknown";
 }
 
 } // namespace poker

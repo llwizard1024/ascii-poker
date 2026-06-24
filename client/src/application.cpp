@@ -131,6 +131,16 @@ void ClientApplication::quit()
     quit_flag_.store(true);
 }
 
+bool ClientApplication::is_connected() const
+{
+    return client_->is_connected();
+}
+
+void ClientApplication::reconnect()
+{
+    client_->reconnect();
+}
+
 void ClientApplication::player_action_from_command(const std::string& action_str, const std::vector<std::string>& args)
 {
     std::optional<uint32_t> amount = std::nullopt;
