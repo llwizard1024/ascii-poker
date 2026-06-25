@@ -14,41 +14,37 @@
 
 namespace poker::server {
 
-
 namespace pp = poker::protocol;
 
 namespace {
 
-constexpr size_t kMinPlayerNameLength = 1;
-constexpr size_t kMaxPlayerNameLength = 32;
+    constexpr size_t kMinPlayerNameLength = 1;
+    constexpr size_t kMaxPlayerNameLength = 32;
 
-
-std::string trim_copy(std::string value)
-{
-    const auto not_space = [](unsigned char ch) { return !std::isspace(ch); };
-    value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
-    value.erase(std::find_if(value.rbegin(), value.rend(), not_space).base(), value.end());
-    return value;
-}
-
-
-bool is_valid_player_name(const std::string& name)
-{
-    if (name.size() < kMinPlayerNameLength || name.size() > kMaxPlayerNameLength) {
-        return false;
+    std::string trim_copy(std::string value)
+    {
+        const auto not_space = [](unsigned char ch) { return !std::isspace(ch); };
+        value.erase(value.begin(), std::find_if(value.begin(), value.end(), not_space));
+        value.erase(std::find_if(value.rbegin(), value.rend(), not_space).base(), value.end());
+        return value;
     }
 
-    for (unsigned char ch : name) {
-        if (std::iscntrl(ch)) {
+    bool is_valid_player_name(const std::string& name)
+    {
+        if (name.size() < kMinPlayerNameLength || name.size() > kMaxPlayerNameLength) {
             return false;
         }
+
+        for (unsigned char ch : name) {
+            if (std::iscntrl(ch)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
-    return true;
-}
-
 } // namespace
-
 
 HandshakeMessageProcessor::HandshakeMessageProcessor(
     std::shared_ptr<Lobby> lobby,
@@ -61,9 +57,7 @@ HandshakeMessageProcessor::HandshakeMessageProcessor(
 {
 }
 
-
 HandshakeMessageProcessor::~HandshakeMessageProcessor() = default;
-
 
 void HandshakeMessageProcessor::process_message(const std::string& json, ConnectionPtr connection)
 {
@@ -127,7 +121,6 @@ void HandshakeMessageProcessor::process_message(const std::string& json, Connect
 
     lobby_processor_->process_client_message(msg, connection);
 }
-
 
 void HandshakeMessageProcessor::on_disconnect(ConnectionPtr connection)
 {

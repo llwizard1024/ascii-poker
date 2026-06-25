@@ -13,7 +13,7 @@
 namespace poker::client {
 
 namespace {
-constexpr size_t kMaxLogLines = 200;
+    constexpr size_t kMaxLogLines = 200;
 }
 
 void ClientViewState::append_log(std::string message)

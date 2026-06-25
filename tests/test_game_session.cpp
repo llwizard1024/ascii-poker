@@ -12,9 +12,9 @@
 #include <vector>
 
 using namespace poker::server;
-using poker::test::MockConnection;
-using poker::test::find_message;
 using poker::test::find_last_message;
+using poker::test::find_message;
+using poker::test::MockConnection;
 
 namespace {
 

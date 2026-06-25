@@ -8,24 +8,24 @@ namespace poker::client {
 
 namespace {
 
-std::string settings_path()
-{
-    if (const char* home = std::getenv("HOME")) {
-        return std::string(home) + "/.ascii-poker.conf";
+    std::string settings_path()
+    {
+        if (const char* home = std::getenv("HOME")) {
+            return std::string(home) + "/.ascii-poker.conf";
+        }
+        return ".ascii-poker.conf";
     }
-    return ".ascii-poker.conf";
-}
 
-void trim(std::string& value)
-{
-    const auto start = value.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) {
-        value.clear();
-        return;
+    void trim(std::string& value)
+    {
+        const auto start = value.find_first_not_of(" \t\r\n");
+        if (start == std::string::npos) {
+            value.clear();
+            return;
+        }
+        const auto end = value.find_last_not_of(" \t\r\n");
+        value = value.substr(start, end - start + 1);
     }
-    const auto end = value.find_last_not_of(" \t\r\n");
-    value = value.substr(start, end - start + 1);
-}
 
 } // namespace
 

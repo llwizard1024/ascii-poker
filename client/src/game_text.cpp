@@ -11,75 +11,75 @@ namespace poker::client {
 
 namespace {
 
-std::string trim_copy(std::string value)
-{
-    const auto start = value.find_first_not_of(" \t");
-    if (start == std::string::npos) {
-        return {};
+    std::string trim_copy(std::string value)
+    {
+        const auto start = value.find_first_not_of(" \t");
+        if (start == std::string::npos) {
+            return {};
+        }
+        const auto end = value.find_last_not_of(" \t");
+        return value.substr(start, end - start + 1);
     }
-    const auto end = value.find_last_not_of(" \t");
-    return value.substr(start, end - start + 1);
-}
 
-uint8_t rank_order(poker::Rank rank)
-{
-    switch (rank) {
-    case poker::Rank::Two:
-        return 2;
-    case poker::Rank::Three:
-        return 3;
-    case poker::Rank::Four:
-        return 4;
-    case poker::Rank::Five:
-        return 5;
-    case poker::Rank::Six:
-        return 6;
-    case poker::Rank::Seven:
-        return 7;
-    case poker::Rank::Eight:
-        return 8;
-    case poker::Rank::Nine:
-        return 9;
-    case poker::Rank::Ten:
-        return 10;
-    case poker::Rank::Jack:
-        return 11;
-    case poker::Rank::Queen:
-        return 12;
-    case poker::Rank::King:
-        return 13;
-    case poker::Rank::Ace:
-        return 14;
+    uint8_t rank_order(poker::Rank rank)
+    {
+        switch (rank) {
+        case poker::Rank::Two:
+            return 2;
+        case poker::Rank::Three:
+            return 3;
+        case poker::Rank::Four:
+            return 4;
+        case poker::Rank::Five:
+            return 5;
+        case poker::Rank::Six:
+            return 6;
+        case poker::Rank::Seven:
+            return 7;
+        case poker::Rank::Eight:
+            return 8;
+        case poker::Rank::Nine:
+            return 9;
+        case poker::Rank::Ten:
+            return 10;
+        case poker::Rank::Jack:
+            return 11;
+        case poker::Rank::Queen:
+            return 12;
+        case poker::Rank::King:
+            return 13;
+        case poker::Rank::Ace:
+            return 14;
+        }
+        return 0;
     }
-    return 0;
-}
 
-std::string rank_short(poker::Rank rank)
-{
-    switch (rank) {
-    case poker::Rank::Ten:
-        return "T";
-    case poker::Rank::Jack:
-        return "J";
-    case poker::Rank::Queen:
-        return "Q";
-    case poker::Rank::King:
-        return "K";
-    case poker::Rank::Ace:
-        return "A";
-    default:
-        return std::to_string(rank_order(rank));
+    std::string rank_short(poker::Rank rank)
+    {
+        switch (rank) {
+        case poker::Rank::Ten:
+            return "T";
+        case poker::Rank::Jack:
+            return "J";
+        case poker::Rank::Queen:
+            return "Q";
+        case poker::Rank::King:
+            return "K";
+        case poker::Rank::Ace:
+            return "A";
+        default:
+            return std::to_string(rank_order(rank));
+        }
     }
-}
 
-std::string hole_notation(const poker::Card& high, const poker::Card& low)
-{
-    const std::string ranks = rank_short(high.rank()) + rank_short(low.rank());
-    if (high.suit() == low.suit()) {
-        return ranks + "s";
+    std::string hole_notation(const poker::Card& high, const poker::Card& low)
+    {
+        const std::string ranks = rank_short(high.rank()) + rank_short(low.rank());
+        if (high.suit() == low.suit()) {
+            return ranks + "s";
+        }
+        return ranks + "o";
     }
-    return ranks + "o";
-}
 
 } // namespace
 

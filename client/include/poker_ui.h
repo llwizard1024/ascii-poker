@@ -1,9 +1,9 @@
 #pragma once
 
 #include "application.h"
+#include "client_settings.h"
 #include "client_view_state.h"
 #include "ftxui_all.hpp"
-#include "client_settings.h"
 #include "poker/protocol.h"
 
 #include <memory>
