@@ -2,7 +2,9 @@
 
 #include "game/remote_player.h"
 #include "poker/error_codes.h"
+#include "poker/game_constants.h"
 #include "poker/protocol.h"
+#include "storage/user_repository.h"
 
 #include <spdlog/spdlog.h>
 
@@ -11,13 +13,45 @@
 
 namespace poker::server {
 
-Room::Room(uint64_t id, std::string name, uint8_t max_players, ConnectionPtr host)
-    : id_(id)
+Room::Room(
+    uint64_t id,
+    std::string name,
+    uint8_t max_players,
+    ConnectionPtr host,
+    UserRepository* user_repository)
+    : user_repository_(user_repository)
+    , id_(id)
     , name_(std::move(name))
     , max_players_(max_players)
     , host_(std::move(host))
 {
     spdlog::info("Room success created with name - {} and id - {}", name_, id_);
+}
+
+std::optional<poker::protocol::ErrorCode> Room::load_player_bankrolls(
+    std::unordered_map<std::string, uint32_t>& bankrolls) const
+{
+    for (const auto& connection : players_) {
+        uint32_t chips = poker::STARTING_CHIPS;
+
+        if (user_repository_) {
+            const auto user = user_repository_->find_by_username(connection->get_name());
+            chips = user.has_value() ? user->chips : 0;
+        }
+
+        if (chips < poker::BIG_BLIND) {
+            spdlog::warn(
+                "Player '{}' has insufficient chips ({}) to play in room {}",
+                connection->get_name(),
+                chips,
+                id_);
+            return poker::protocol::ErrorCode::NotEnoughChips;
+        }
+
+        bankrolls[connection->get_name()] = chips;
+    }
+
+    return std::nullopt;
 }
 
 bool Room::add_player(ConnectionPtr player)
@@ -40,7 +74,10 @@ bool Room::add_player(ConnectionPtr player)
 
     if (players_.size() == max_players_) {
         spdlog::info("Room {} is full, auto-starting game", name_);
-        start_game();
+        if (const auto error = start_game()) {
+            spdlog::warn("Room {} auto-start failed", name_);
+            (void)error;
+        }
     }
 
     return true;
@@ -69,7 +106,7 @@ bool Room::remove_player(ConnectionPtr player)
         spdlog::info("Room {} host transferred to {}", name_, host_->get_name());
     }
 
-    spdlog::info("Player {} removed from room {}", player->get_name(), name_);
+    spdlog::info("Player {} removed from room {}", player->get_name(), id_);
 
     if (!players_.empty()) {
         notify_all_about_joined();
@@ -136,14 +173,18 @@ std::optional<poker::protocol::ErrorCode> Room::try_start_game(ConnectionPtr req
         return poker::protocol::ErrorCode::NotEnoughPlayers;
     }
 
-    start_game();
-    return std::nullopt;
+    return start_game();
 }
 
-void Room::start_game()
+std::optional<poker::protocol::ErrorCode> Room::start_game()
 {
     if (game_session_) {
-        return;
+        return std::nullopt;
+    }
+
+    std::unordered_map<std::string, uint32_t> bankrolls;
+    if (const auto error = load_player_bankrolls(bankrolls)) {
+        return error;
     }
 
     std::vector<std::shared_ptr<IPlayer>> game_players;
@@ -156,8 +197,14 @@ void Room::start_game()
         connection_map[players_[i].get()] = game_players[i].get();
     }
 
-    game_session_ = std::make_unique<GameSession>(game_players, connection_map, id_);
+    game_session_ = std::make_unique<GameSession>(
+        game_players,
+        connection_map,
+        id_,
+        user_repository_,
+        bankrolls);
     game_session_->start();
+    return std::nullopt;
 }
 
 void Room::on_player_action(ConnectionPtr player, poker::protocol::Action action, std::optional<uint32_t> amount)

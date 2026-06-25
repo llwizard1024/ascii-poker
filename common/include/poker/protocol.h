@@ -126,11 +126,12 @@ enum class GamePhase {
 NLOHMANN_JSON_SERIALIZE_ENUM(GamePhase, { { GamePhase::PreFlop, "preflop" }, { GamePhase::Flop, "flop" }, { GamePhase::Turn, "turn" }, { GamePhase::River, "river" }, { GamePhase::Showdown, "showdown" } })
 
 // Client Messages
-struct Hello {
-    std::string player_name;
+struct Login {
+    std::string username;
+    std::string password;
 };
-void to_json(nlohmann::json& j, const Hello& msg);
-void from_json(const nlohmann::json& j, Hello& msg);
+void to_json(nlohmann::json& j, const Login& msg);
+void from_json(const nlohmann::json& j, Login& msg);
 
 struct CreateRoom {
     std::string room_name;
@@ -167,6 +168,8 @@ void from_json(const nlohmann::json& j, PlayerAction& msg);
 // Server Messages
 struct Welcome {
     std::string player_name;
+    uint32_t chips = 0;
+    bool is_new_account = false;
 };
 void to_json(nlohmann::json& j, const Welcome& msg);
 void from_json(const nlohmann::json& j, Welcome& msg);
@@ -251,6 +254,8 @@ void from_json(const nlohmann::json& j, Error& msg);
 
 struct LeftRoom {
     uint64_t room_id;
+    uint32_t your_chips = 0;
+    bool has_your_chips = false;
 };
 void to_json(nlohmann::json& j, const LeftRoom& msg);
 void from_json(const nlohmann::json& j, LeftRoom& msg);
@@ -263,7 +268,7 @@ struct HandResult {
 void to_json(nlohmann::json& j, const HandResult& msg);
 void from_json(const nlohmann::json& j, HandResult& msg);
 
-using ClientMessage = std::variant<Hello, CreateRoom, JoinRoom, LeaveRoom, ListRooms, StartGame, PlayerAction>;
+using ClientMessage = std::variant<Login, CreateRoom, JoinRoom, LeaveRoom, ListRooms, StartGame, PlayerAction>;
 void to_json(nlohmann::json& j, const ClientMessage& msg);
 void from_json(const nlohmann::json& j, ClientMessage& msg);
 

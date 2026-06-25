@@ -30,6 +30,7 @@ struct ClientViewState {
     ConnectionStatus connection = ConnectionStatus::Connecting;
 
     std::string player_name;
+    uint32_t chips = 0;
     std::string server_host;
     std::string server_port;
 

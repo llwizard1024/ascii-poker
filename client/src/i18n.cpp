@@ -1,5 +1,7 @@
 #include "i18n.h"
 
+#include <poker/error_codes.h>
+
 #include <array>
 #include <string>
 
@@ -13,6 +15,7 @@ namespace {
         { "ASCII Poker", "ASCII Покер" },
         { "Enter your name", "Введите имя" },
         { "Name:", "Имя:" },
+        { "Password:", "Пароль:" },
         { "(type below)", "(введите ниже)" },
         { "Press Enter or [Join] when ready.", "Нажмите Enter или [Войти], когда готовы." },
         { "Waiting for server connection...", "Ожидание подключения к серверу..." },
@@ -77,7 +80,12 @@ namespace {
         { "Connecting to {0}...", "Подключение к {0}..." },
         { "Could not connect to {0}", "Не удалось подключиться к {0}" },
         { "Connection lost", "Соединение потеряно" },
-        { "Welcome, {0}", "Добро пожаловать, {0}" },
+        { "Welcome, {0} ({1} chips)", "Добро пожаловать, {0} ({1} фишек)" },
+        { "Account created. Welcome, {0} ({1} chips)", "Аккаунт создан. Добро пожаловать, {0} ({1} фишек)" },
+        { "Wrong password", "Неверный пароль" },
+        { "Account is already online", "Аккаунт уже в сети" },
+        { "Password must be 4-128 characters with at least one letter and one digit",
+            "Пароль: 4–128 символов, минимум одна буква и одна цифра" },
         { "Room list updated ({0} rooms)", "Список комнат обновлён ({0} комн.)" },
         { "Table roster updated", "Состав стола обновлён" },
         { "Joined room {0} ({1})", "Вход в комнату {0} ({1})" },
@@ -91,7 +99,10 @@ namespace {
         { "Action not available: {0}", "Действие недоступно: {0}" },
         { "Not connected to server", "Нет подключения к серверу" },
         { "Enter a player name", "Введите имя игрока" },
+        { "Enter a password", "Введите пароль" },
         { "Name must be 1-32 characters", "Имя: от 1 до 32 символов" },
+        { "Password must be 4-128 characters with at least one letter and one digit",
+            "Пароль: 4–128 символов, минимум одна буква и одна цифра" },
         { "Joining as {0}...", "Вход как {0}..." },
         { "Authenticating...", "Аутентификация..." },
         { "Invalid max players value", "Некорректное число игроков" },
@@ -287,6 +298,21 @@ std::string tr_hand_category(const poker::HandCategory category)
         return tr(Msg::HandStraightFlush);
     }
     return "?";
+}
+
+std::string tr_auth_error(int error_code)
+{
+    using poker::protocol::ErrorCode;
+    switch (static_cast<ErrorCode>(error_code)) {
+    case ErrorCode::WrongPassword:
+        return tr(Msg::ErrWrongPassword);
+    case ErrorCode::AlreadyOnline:
+        return tr(Msg::ErrAlreadyOnline);
+    case ErrorCode::InvalidPassword:
+        return tr(Msg::ErrInvalidPassword);
+    default:
+        return tr(Msg::ErrorPrefix, poker::protocol::error_code_message(static_cast<ErrorCode>(error_code)));
+    }
 }
 
 } // namespace poker::client

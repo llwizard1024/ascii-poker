@@ -21,7 +21,7 @@ public:
     void process_input(const std::string& line);
 
     void list_rooms();
-    void send_hello(const std::string& player_name);
+    void send_login(const std::string& username, const std::string& password);
     void create_room(const std::string& name, uint8_t max_players);
     void join_room(uint64_t room_id);
     void leave_room();

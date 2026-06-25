@@ -5,23 +5,29 @@
 
 #include <poker/card.h>
 #include <poker/deck.h>
+#include <poker/game_constants.h>
 #include <poker/protocol.h>
 
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 namespace poker::server {
 
+class UserRepository;
+
 class GameSession {
 public:
     GameSession(
         std::vector<std::shared_ptr<IPlayer>> players,
         std::unordered_map<IConnection*, IPlayer*> connection_map,
-        uint64_t room_id);
+        uint64_t room_id,
+        UserRepository* user_repository = nullptr,
+        std::unordered_map<std::string, uint32_t> bankrolls = {});
 
     void start();
     void apply_action(ConnectionPtr connection, poker::protocol::Action action, std::optional<uint32_t> amount);
@@ -68,6 +74,11 @@ private:
     void begin_betting_round();
     void record_player_action(IPlayer* player, poker::protocol::Action action);
     std::vector<poker::protocol::PlayerState> build_player_states(bool reveal_hole_cards) const;
+    void persist_player_chips(IPlayer* player);
+    void persist_all_chips();
+
+    UserRepository* user_repository_ = nullptr;
+    std::unordered_map<std::string, uint32_t> bankrolls_;
 
     std::vector<std::shared_ptr<IPlayer>> players_;
     std::unordered_map<IConnection*, IPlayer*> connection_map_;

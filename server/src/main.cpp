@@ -4,6 +4,7 @@
 #include <asio/signal_set.hpp>
 #include <cstdlib>
 #include <spdlog/spdlog.h>
+#include <storage/database.h>
 #include <string>
 
 namespace {
@@ -28,8 +29,9 @@ int main(int argc, char* argv[])
 
     try {
         const unsigned short port = parse_port(argc, argv, 12345);
+        const std::string database_path = poker::server::default_database_path();
         asio::io_context io_context;
-        poker::server::Server server(io_context, port);
+        poker::server::Server server(io_context, port, database_path);
         server.start_accept();
 
         asio::signal_set signals(io_context, SIGINT, SIGTERM);

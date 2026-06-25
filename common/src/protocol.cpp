@@ -12,14 +12,15 @@ Error make_error(ErrorCode code, std::string detail)
     return Error { static_cast<int>(code), std::move(description) };
 }
 
-void to_json(nlohmann::json& j, const Hello& msg)
+void to_json(nlohmann::json& j, const Login& msg)
 {
-    j = nlohmann::json { { "player_name", msg.player_name } };
+    j = nlohmann::json { { "username", msg.username }, { "password", msg.password } };
 }
 
-void from_json(const nlohmann::json& j, Hello& msg)
+void from_json(const nlohmann::json& j, Login& msg)
 {
-    j.at("player_name").get_to(msg.player_name);
+    j.at("username").get_to(msg.username);
+    j.at("password").get_to(msg.password);
 }
 
 void to_json(nlohmann::json& j, const CreateRoom& msg)
@@ -98,12 +99,26 @@ void from_json(const nlohmann::json& j, PlayerAction& msg)
 
 void to_json(nlohmann::json& j, const Welcome& msg)
 {
-    j = nlohmann::json { { "player_name", msg.player_name } };
+    j = nlohmann::json {
+        { "player_name", msg.player_name },
+        { "chips", msg.chips },
+        { "is_new_account", msg.is_new_account },
+    };
 }
 
 void from_json(const nlohmann::json& j, Welcome& msg)
 {
     j.at("player_name").get_to(msg.player_name);
+    if (j.contains("chips")) {
+        j.at("chips").get_to(msg.chips);
+    } else {
+        msg.chips = 0;
+    }
+    if (j.contains("is_new_account")) {
+        j.at("is_new_account").get_to(msg.is_new_account);
+    } else {
+        msg.is_new_account = false;
+    }
 }
 
 void to_json(nlohmann::json& j, const RoomInfo& msg)
@@ -306,12 +321,26 @@ void from_json(const nlohmann::json& j, Error& msg)
 
 void to_json(nlohmann::json& j, const LeftRoom& msg)
 {
-    j = nlohmann::json { { "room_id", msg.room_id } };
+    j = nlohmann::json {
+        { "room_id", msg.room_id },
+        { "your_chips", msg.your_chips },
+        { "has_your_chips", msg.has_your_chips },
+    };
 }
 
 void from_json(const nlohmann::json& j, LeftRoom& msg)
 {
     j.at("room_id").get_to(msg.room_id);
+    if (j.contains("your_chips")) {
+        j.at("your_chips").get_to(msg.your_chips);
+    } else {
+        msg.your_chips = 0;
+    }
+    if (j.contains("has_your_chips")) {
+        j.at("has_your_chips").get_to(msg.has_your_chips);
+    } else {
+        msg.has_your_chips = false;
+    }
 }
 
 void to_json(nlohmann::json& j, const HandResult& msg)
@@ -338,8 +367,8 @@ void to_json(nlohmann::json& j, const ClientMessage& msg)
 {
     std::visit([&j](const auto& concrete) {
         using T = std::decay_t<decltype(concrete)>;
-        if constexpr (std::is_same_v<T, Hello>) {
-            j["type"] = "hello";
+        if constexpr (std::is_same_v<T, Login>) {
+            j["type"] = "login";
         } else if constexpr (std::is_same_v<T, CreateRoom>) {
             j["type"] = "create_room";
         } else if constexpr (std::is_same_v<T, JoinRoom>) {
@@ -361,8 +390,8 @@ void to_json(nlohmann::json& j, const ClientMessage& msg)
 void from_json(const nlohmann::json& j, ClientMessage& msg)
 {
     const auto type = j.at("type").get<std::string>();
-    if (type == "hello") {
-        msg = j.at("data").get<Hello>();
+    if (type == "login") {
+        msg = j.at("data").get<Login>();
     } else if (type == "create_room") {
         msg = j.at("data").get<CreateRoom>();
     } else if (type == "join_room") {

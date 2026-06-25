@@ -21,6 +21,9 @@ enum class ErrorCode : int {
     NotRoomHost = 14,
     NotEnoughPlayers = 15,
     GameAlreadyStarted = 16,
+    WrongPassword = 17,
+    AlreadyOnline = 18,
+    InvalidPassword = 19,
 };
 
 constexpr std::string_view error_code_message(ErrorCode code)
@@ -49,7 +52,7 @@ constexpr std::string_view error_code_message(ErrorCode code)
     case ErrorCode::InvalidPlayerName:
         return "Invalid player name";
     case ErrorCode::NotAuthenticated:
-        return "Send hello with a player name first";
+        return "Send login with username and password first";
     case ErrorCode::RoomFull:
         return "Room is full";
     case ErrorCode::NotRoomHost:
@@ -58,6 +61,12 @@ constexpr std::string_view error_code_message(ErrorCode code)
         return "At least 2 players are required to start";
     case ErrorCode::GameAlreadyStarted:
         return "Game has already started";
+    case ErrorCode::WrongPassword:
+        return "Wrong password";
+    case ErrorCode::AlreadyOnline:
+        return "Account is already online";
+    case ErrorCode::InvalidPassword:
+        return "Invalid password (4-128 chars, letter and digit required)";
     }
     return "Unknown error";
 }

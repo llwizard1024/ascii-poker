@@ -3,8 +3,10 @@
 #include "client_settings.h"
 #include "game_text.h"
 #include "i18n.h"
+#include "poker/auth.h"
 #include "poker/game_constants.h"
 #include "ui_cards.h"
+#include "ui_theme.h"
 
 #include <charconv>
 #include <ftxui_all.hpp>
@@ -138,19 +140,19 @@ void PokerUI::toggle_language()
 
 void PokerUI::on_connection_changed(const ConnectionStatus status)
 {
-    bool auto_hello = false;
+    bool auto_login = false;
     {
         std::lock_guard lock(mtx_);
         state_.set_connection(status);
         sync_control_visibility();
-        if (pending_auto_hello_ && status == ConnectionStatus::Connected) {
-            auto_hello = true;
-            pending_auto_hello_ = false;
+        if (pending_auto_login_ && status == ConnectionStatus::Connected) {
+            auto_login = true;
+            pending_auto_login_ = false;
         }
     }
     notify_redraw();
-    if (auto_hello) {
-        submit_hello();
+    if (auto_login) {
+        submit_login();
     }
 }
 
@@ -174,6 +176,7 @@ void PokerUI::lobby_room_step(const int delta)
 bool PokerUI::text_input_has_focus() const
 {
     return (player_name_input_ && player_name_input_->Focused())
+        || (login_password_input_ && login_password_input_->Focused())
         || (login_host_input_ && login_host_input_->Focused())
         || (login_port_input_ && login_port_input_->Focused())
         || (create_name_input_ && create_name_input_->Focused())
@@ -232,6 +235,11 @@ void PokerUI::apply_pending_refocus()
             player_name_input_->TakeFocus();
         }
         break;
+    case PendingRefocus::PasswordInput:
+        if (login_password_input_) {
+            login_password_input_->TakeFocus();
+        }
+        break;
     case PendingRefocus::None:
         break;
     }
@@ -255,7 +263,7 @@ void PokerUI::add_server_message(const poker::protocol::ServerMessage& msg)
             } else if (show_create_panel_) {
                 pending_refocus_ = PendingRefocus::CreateNameInput;
             } else if (state_.screen == UiScreen::Login) {
-                pending_refocus_ = PendingRefocus::PlayerNameInput;
+                pending_refocus_ = PendingRefocus::PasswordInput;
             }
         } else if (std::holds_alternative<poker::protocol::Welcome>(msg)) {
             save_client_settings(ClientSettings {
@@ -349,7 +357,7 @@ void PokerUI::show_create_panel(const bool show)
     notify_redraw();
 }
 
-void PokerUI::submit_hello()
+void PokerUI::submit_login()
 {
     if (!app_->is_connected()) {
         std::lock_guard lock(mtx_);
@@ -359,12 +367,14 @@ void PokerUI::submit_hello()
     }
 
     std::string name;
+    std::string password;
     std::string host;
     std::string port;
     bool endpoint_changed = false;
     {
         std::lock_guard lock(mtx_);
         name = player_name_input_value_;
+        password = login_password_value_;
         host = login_host_value_;
         port = login_port_value_;
         const auto trim_start = name.find_first_not_of(" \t\r\n");
@@ -377,9 +387,23 @@ void PokerUI::submit_hello()
         const auto trim_end = name.find_last_not_of(" \t\r\n");
         name = name.substr(trim_start, trim_end - trim_start + 1);
 
-        if (name.empty() || name.size() > 32) {
+        if (!poker::auth::is_valid_username(name)) {
             state_.append_log(tr(Msg::NameLengthInvalid));
             pending_refocus_ = PendingRefocus::PlayerNameInput;
+            notify_redraw();
+            return;
+        }
+
+        if (password.empty()) {
+            state_.append_log(tr(Msg::EnterPassword));
+            pending_refocus_ = PendingRefocus::PasswordInput;
+            notify_redraw();
+            return;
+        }
+
+        if (!poker::auth::is_valid_password(password)) {
+            state_.append_log(tr(Msg::PasswordRules));
+            pending_refocus_ = PendingRefocus::PasswordInput;
             notify_redraw();
             return;
         }
@@ -391,7 +415,7 @@ void PokerUI::submit_hello()
     }
 
     if (endpoint_changed) {
-        pending_auto_hello_ = true;
+        pending_auto_login_ = true;
         app_->reconnect_to(host, port);
         {
             std::lock_guard lock(mtx_);
@@ -409,7 +433,7 @@ void PokerUI::submit_hello()
         return;
     }
 
-    app_->send_hello(name);
+    app_->send_login(name, password);
 
     save_client_settings(ClientSettings {
         name,
@@ -505,6 +529,7 @@ Element PokerUI::render_header() const
     std::string title = tr(Msg::AppTitle);
     if (!state_.player_name.empty()) {
         title += "  |  " + state_.player_name;
+        title += "  |  " + std::to_string(state_.chips) + tr(Msg::PlayerChips);
     }
     if (state_.room_id.has_value()) {
         title += "  |  " + tr(Msg::HeaderRoom, std::to_string(*state_.room_id));
@@ -530,8 +555,9 @@ Element PokerUI::render_login() const
     return vbox(
         text(tr(Msg::EnterYourName)) | bold,
         separator(),
-        text(tr(Msg::NameLabel) + " / " + tr(Msg::HostLabel) + " / " + tr(Msg::PortLabel) + " — " + tr(Msg::TypeBelow)) | dim,
+        text(tr(Msg::NameLabel) + " / " + tr(Msg::PasswordLabel) + " / " + tr(Msg::HostLabel) + " / " + tr(Msg::PortLabel) + " — " + tr(Msg::TypeBelow)) | dim,
         text(tr(Msg::PressJoinWhenReady)) | dim,
+        text(tr(Msg::PasswordRules)) | dim,
         text(ready ? tr(Msg::ConnectedTo, state_.server_host + ":" + state_.server_port)
                    : tr(Msg::WaitingForConnection))
             | dim);
@@ -579,7 +605,7 @@ Element PokerUI::render_lobby() const
         text(tr(Msg::BlindsInfo,
             std::to_string(poker::SMALL_BLIND),
             std::to_string(poker::BIG_BLIND),
-            std::to_string(poker::STARTING_CHIPS)))
+            std::to_string(state_.chips)))
             | dim);
 }
 
@@ -653,7 +679,7 @@ Element PokerUI::render_game_table() const
         seats,
     };
 
-    return vbox(std::move(body));
+    return vbox(std::move(body)) | bgcolor(ui_theme::panel_background()) | border;
 }
 
 Element PokerUI::render_body() const
@@ -781,6 +807,7 @@ Element PokerUI::render_ui() const
                separator(),
                render_status_bar(),
                render_log_panel())
+        | bgcolor(ui_theme::panel_background())
         | border;
 }
 
@@ -791,25 +818,28 @@ void PokerUI::run()
 
     refresh_button_labels();
 
-    auto enter_btn = Button(&btn_.join, [this] { submit_hello(); });
-    auto login_quit_btn = Button(&btn_.quit, [this, &screen] {
+    auto enter_btn = ui_theme::make_button(&btn_.join, [this] { submit_login(); });
+    auto login_quit_btn = ui_theme::make_button(&btn_.quit, [this, &screen] {
         app_->quit();
         screen.ExitLoopClosure()();
     });
 
-    player_name_input_ = Input(&player_name_input_value_, "your name");
-    login_host_input_ = Input(&login_host_value_, "host");
-    login_port_input_ = Input(&login_port_value_, "port");
-    auto login_lang_btn = Button(&btn_.lang, [this] { toggle_language(); });
+    player_name_input_ = ui_theme::make_input(&player_name_input_value_, "username");
+    login_password_input_ = ui_theme::make_password_input(
+        &login_password_value_, "password", &login_password_mode_);
+    login_host_input_ = ui_theme::make_input(&login_host_value_, "host");
+    login_port_input_ = ui_theme::make_input(&login_port_value_, "port");
+    auto login_lang_btn = ui_theme::make_button(&btn_.lang, [this] { toggle_language(); });
     auto login_controls = Container::Vertical(Components {
         player_name_input_,
+        login_password_input_,
         login_host_input_,
         login_port_input_,
         Container::Horizontal(Components { enter_btn, login_lang_btn, login_quit_btn }),
     });
 
-    auto refresh_btn = Button(&btn_.refresh, [this] { app_->list_rooms(); });
-    auto create_btn = Button(&btn_.create, [this] {
+    auto refresh_btn = ui_theme::make_button(&btn_.refresh, [this] { app_->list_rooms(); });
+    auto create_btn = ui_theme::make_button(&btn_.create, [this] {
         std::lock_guard lock(mtx_);
         show_create_panel_ = !show_create_panel_;
         sync_control_visibility();
@@ -818,7 +848,7 @@ void PokerUI::run()
         }
         notify_redraw();
     });
-    auto join_room_btn = Button(&btn_.join, [this] {
+    auto join_room_btn = ui_theme::make_button(&btn_.join, [this] {
         std::lock_guard lock(mtx_);
         if (selected_room_index_ >= 0 && selected_room_index_ < static_cast<int>(state_.rooms.size())) {
             const auto& room = state_.rooms[static_cast<size_t>(selected_room_index_)];
@@ -833,26 +863,26 @@ void PokerUI::run()
             notify_redraw();
         }
     });
-    auto waiting_leave_btn = Button(&btn_.leave, [this] { app_->leave_room(); });
-    auto game_leave_btn = Button(&btn_.leave, [this] { app_->leave_room(); });
-    auto start_btn = Button(&btn_.start, [this] { app_->start_game(); });
-    auto refresh_btn_waiting = Button(&btn_.refresh, [this] { app_->list_rooms(); });
-    auto lobby_quit_btn = Button(&btn_.quit, [this, &screen] {
+    auto waiting_leave_btn = ui_theme::make_button(&btn_.leave, [this] { app_->leave_room(); });
+    auto game_leave_btn = ui_theme::make_button(&btn_.leave, [this] { app_->leave_room(); });
+    auto start_btn = ui_theme::make_button(&btn_.start, [this] { app_->start_game(); });
+    auto refresh_btn_waiting = ui_theme::make_button(&btn_.refresh, [this] { app_->list_rooms(); });
+    auto lobby_quit_btn = ui_theme::make_button(&btn_.quit, [this, &screen] {
         app_->quit();
         screen.ExitLoopClosure()();
     });
-    auto waiting_quit_btn = Button(&btn_.quit, [this, &screen] {
+    auto waiting_quit_btn = ui_theme::make_button(&btn_.quit, [this, &screen] {
         app_->quit();
         screen.ExitLoopClosure()();
     });
-    auto game_quit_btn = Button(&btn_.quit, [this, &screen] {
+    auto game_quit_btn = ui_theme::make_button(&btn_.quit, [this, &screen] {
         app_->quit();
         screen.ExitLoopClosure()();
     });
-    auto reconnect_btn = Button(&btn_.reconnect, [this] {
+    auto reconnect_btn = ui_theme::make_button(&btn_.reconnect, [this] {
         {
             std::lock_guard lock(mtx_);
-            pending_auto_hello_ = !state_.player_name.empty();
+            pending_auto_login_ = !state_.player_name.empty() && !login_password_value_.empty();
             state_.reset_play_session();
             state_.connection = ConnectionStatus::Connecting;
             state_.status_message = tr(Msg::ConnectingTo, state_.server_host + ":" + state_.server_port);
@@ -862,24 +892,24 @@ void PokerUI::run()
         notify_redraw();
         app_->reconnect();
     });
-    auto disconnected_quit_btn = Button(&btn_.quit, [this, &screen] {
+    auto disconnected_quit_btn = ui_theme::make_button(&btn_.quit, [this, &screen] {
         app_->quit();
         screen.ExitLoopClosure()();
     });
 
-    auto confirm_create_btn = Button(&btn_.confirm, [this] { submit_create_room(); });
-    auto cancel_create_btn = Button(&btn_.cancel, [this] { show_create_panel(false); });
+    auto confirm_create_btn = ui_theme::make_button(&btn_.confirm, [this] { submit_create_room(); });
+    auto cancel_create_btn = ui_theme::make_button(&btn_.cancel, [this] { show_create_panel(false); });
 
-    create_name_input_ = Input(&create_room_name_, "room name");
-    create_size_input_ = Input(&create_max_players_, "max players");
+    create_name_input_ = ui_theme::make_input(&create_room_name_, "room name");
+    create_size_input_ = ui_theme::make_input(&create_max_players_, "max players");
 
-    auto fold_btn = Button(&btn_.fold, [this] { send_action(poker::protocol::Action::Fold); });
-    auto check_btn = Button(&btn_.check, [this] { send_action(poker::protocol::Action::Check); });
-    auto call_btn = Button(&btn_.call, [this] { send_action(poker::protocol::Action::Call); });
-    auto raise_btn = Button(&btn_.raise, [this] { submit_raise(); });
-    raise_input_ = Input(&raise_amount_, "amount");
+    auto fold_btn = ui_theme::make_button(&btn_.fold, [this] { send_action(poker::protocol::Action::Fold); });
+    auto check_btn = ui_theme::make_button(&btn_.check, [this] { send_action(poker::protocol::Action::Check); });
+    auto call_btn = ui_theme::make_button(&btn_.call, [this] { send_action(poker::protocol::Action::Call); });
+    auto raise_btn = ui_theme::make_button(&btn_.raise, [this] { submit_raise(); });
+    raise_input_ = ui_theme::make_input(&raise_amount_, "amount");
 
-    auto min_raise_btn = Button(&btn_.min, [this] {
+    auto min_raise_btn = ui_theme::make_button(&btn_.min, [this] {
         uint32_t amount = 0;
         {
             std::lock_guard lock(mtx_);
@@ -889,7 +919,7 @@ void PokerUI::run()
         }
         send_preset_raise(amount);
     });
-    auto half_raise_btn = Button(&btn_.half, [this] {
+    auto half_raise_btn = ui_theme::make_button(&btn_.half, [this] {
         uint32_t amount = 0;
         {
             std::lock_guard lock(mtx_);
@@ -901,7 +931,7 @@ void PokerUI::run()
         }
         send_preset_raise(amount);
     });
-    auto pot_raise_btn = Button(&btn_.pot, [this] {
+    auto pot_raise_btn = ui_theme::make_button(&btn_.pot, [this] {
         uint32_t amount = 0;
         {
             std::lock_guard lock(mtx_);
@@ -913,7 +943,7 @@ void PokerUI::run()
         }
         send_preset_raise(amount);
     });
-    auto allin_raise_btn = Button(&btn_.allin, [this] {
+    auto allin_raise_btn = ui_theme::make_button(&btn_.allin, [this] {
         uint32_t amount = 0;
         {
             std::lock_guard lock(mtx_);
@@ -924,9 +954,9 @@ void PokerUI::run()
         send_preset_raise(amount);
     });
 
-    auto room_up_btn = Button(&btn_.room_up, [this] { lobby_room_step(-1); });
-    auto room_down_btn = Button(&btn_.room_down, [this] { lobby_room_step(1); });
-    auto lobby_lang_btn = Button(&btn_.lang, [this] { toggle_language(); });
+    auto room_up_btn = ui_theme::make_button(&btn_.room_up, [this] { lobby_room_step(-1); });
+    auto room_down_btn = ui_theme::make_button(&btn_.room_down, [this] { lobby_room_step(1); });
+    auto lobby_lang_btn = ui_theme::make_button(&btn_.lang, [this] { toggle_language(); });
     auto lobby_controls = Container::Horizontal(Components {
         room_up_btn,
         room_down_btn,
@@ -974,7 +1004,7 @@ void PokerUI::run()
                 on_login = state_.screen == UiScreen::Login;
             }
             if (on_login) {
-                submit_hello();
+                submit_login();
                 return true;
             }
         }

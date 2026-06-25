@@ -3,6 +3,7 @@
 #include "game_text.h"
 #include "i18n.h"
 
+#include <poker/error_codes.h>
 #include <poker/protocol.h>
 
 #include <algorithm>
@@ -104,9 +105,14 @@ void ClientViewState::apply_message(const poker::protocol::ServerMessage& msg)
 
         if constexpr (std::is_same_v<T, poker::protocol::Welcome>) {
             player_name = concrete.player_name;
+            chips = concrete.chips;
             screen = UiScreen::Lobby;
-            append_log(tr(Msg::WelcomeUser, player_name));
-            status_message = tr(Msg::WelcomeUser, player_name);
+            const std::string chips_str = std::to_string(concrete.chips);
+            const std::string welcome = concrete.is_new_account
+                ? tr(Msg::WelcomeNewAccount, player_name, chips_str)
+                : tr(Msg::WelcomeUser, player_name, chips_str);
+            append_log(welcome);
+            status_message = welcome;
         } else if constexpr (std::is_same_v<T, poker::protocol::RoomList>) {
             rooms = concrete.rooms;
             append_log(tr(Msg::RoomListUpdated, std::to_string(rooms.size())));
@@ -148,12 +154,19 @@ void ClientViewState::apply_message(const poker::protocol::ServerMessage& msg)
             last_hand_result.reset();
             game_state = concrete;
             screen = UiScreen::InGame;
+            for (const auto& player : concrete.players) {
+                if (player.name == player_name) {
+                    chips = player.chips;
+                    break;
+                }
+            }
             status_message = tr(Msg::PhasePrefix, tr_phase(concrete.phase));
             if (!concrete.active_player_name.empty()) {
                 status_message += " — " + tr(Msg::ToActSuffix, concrete.active_player_name);
             }
         } else if constexpr (std::is_same_v<T, poker::protocol::YourTurn>) {
             your_turn = concrete;
+            chips = concrete.your_chips;
             screen = UiScreen::InGame;
             status_message = tr(Msg::YourTurn);
         } else if constexpr (std::is_same_v<T, poker::protocol::HandResult>) {
@@ -170,11 +183,17 @@ void ClientViewState::apply_message(const poker::protocol::ServerMessage& msg)
             const uint64_t left_id = concrete.room_id;
             reset_play_session();
             screen = UiScreen::Lobby;
+            if (concrete.has_your_chips) {
+                chips = concrete.your_chips;
+            }
             append_log(tr(Msg::LeftRoomLog, std::to_string(left_id)));
             status_message = tr(Msg::InLobby);
         } else if constexpr (std::is_same_v<T, poker::protocol::Error>) {
-            append_log(tr(Msg::ErrorPrefix, concrete.description));
-            status_message = concrete.description;
+            const std::string message = (screen == UiScreen::Login)
+                ? tr_auth_error(concrete.code)
+                : tr(Msg::ErrorPrefix, concrete.description);
+            append_log(message);
+            status_message = message;
         }
     },
         msg);

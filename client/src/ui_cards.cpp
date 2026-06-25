@@ -2,6 +2,7 @@
 
 #include "client_view_state.h"
 #include "i18n.h"
+#include "ui_theme.h"
 
 #include <ftxui_all.hpp>
 
@@ -53,7 +54,11 @@ namespace {
     {
         const std::string top = "+" + std::string(label.size() + 2, '-');
         const std::string mid = "| " + label + " |";
-        return vbox({ text(top), text(mid), text(top) }) | (red ? color(Color::Red) : color(Color::White)) | bold;
+        const Color suit_color = red ? ui_theme::red_suit() : ui_theme::black_suit();
+        return vbox({ text(top), text(mid), text(top) })
+            | color(suit_color)
+            | bgcolor(ui_theme::card_background())
+            | border;
     }
 
     std::string player_role_suffix(const poker::protocol::PlayerState& player)
@@ -97,7 +102,9 @@ Element render_card_back()
                text("|## |"),
                text("+---+"),
            })
-        | color(Color::GrayDark);
+        | color(Color::RGB(120, 130, 145))
+        | bgcolor(Color::RGB(30, 34, 44))
+        | border;
 }
 
 Element render_card_row(const std::vector<poker::Card>& cards, const size_t slots)
@@ -126,6 +133,7 @@ Element render_table_seats(
     const auto render_seat = [&](const poker::protocol::PlayerState& player) {
         const bool active = player.name == active_name;
         const bool self = player.name == self_name;
+        const bool folded = player.folded;
         std::ostringstream line;
         line << (active ? ">> " : "   ") << player.name;
         if (self) {
@@ -138,7 +146,14 @@ Element render_table_seats(
         line << player_role_suffix(player);
         line << player_status_suffix(player);
 
-        Element seat = text(line.str()) | (active ? color(Color::Yellow) | bold : nothing);
+        Element seat = text(line.str());
+        if (active) {
+            seat = seat | color(Color::RGB(240, 210, 120)) | bold;
+        } else if (folded) {
+            seat = seat | dim;
+        } else if (self) {
+            seat = seat | color(Color::RGB(170, 200, 230));
+        }
         if (!player.hole_cards.empty()) {
             seat = vbox({ seat, render_card_row(player.hole_cards, 2) });
         }

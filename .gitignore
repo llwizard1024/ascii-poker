@@ -67,3 +67,8 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# SQLite databases (local runtime data)
+*.db
+*.db-shm
+*.db-wal

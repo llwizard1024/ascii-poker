@@ -55,6 +55,11 @@ void LobbyMessageProcessor::process_client_message(const pp::ClientMessage& msg,
                 return;
             }
 
+            if (const auto error = lobby_->check_player_bankroll(connection)) {
+                connection->send(pp::ServerMessage { pp::make_error(*error) });
+                return;
+            }
+
             lobby_->create_room(concrete_msg.room_name, concrete_msg.max_players, connection);
         } else if constexpr (std::is_same_v<T, pp::JoinRoom>) {
             spdlog::info("Join Room Message (Lobby Processor)");
@@ -68,7 +73,13 @@ void LobbyMessageProcessor::process_client_message(const pp::ClientMessage& msg,
             const auto room = lobby_->find_room_by_player(connection);
             const uint64_t room_id = room ? room->get_id() : 0;
             lobby_->leave_room(connection);
-            connection->send(pp::ServerMessage { pp::LeftRoom { room_id } });
+
+            pp::LeftRoom left { room_id };
+            if (const auto chips = lobby_->account_chips_for(connection->get_name())) {
+                left.your_chips = *chips;
+                left.has_your_chips = true;
+            }
+            connection->send(pp::ServerMessage { left });
         } else if constexpr (std::is_same_v<T, pp::ListRooms>) {
             spdlog::info("List Rooms Message (Lobby Processor)");
             connection->send(pp::ServerMessage { lobby_->get_room_list() });

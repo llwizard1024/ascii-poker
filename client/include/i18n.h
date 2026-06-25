@@ -17,6 +17,7 @@ enum class Msg : unsigned {
     AppTitle,
     EnterYourName,
     NameLabel,
+    PasswordLabel,
     TypeBelow,
     PressJoinWhenReady,
     WaitingForConnection,
@@ -82,6 +83,10 @@ enum class Msg : unsigned {
     CouldNotConnect,
     ConnectionLostShort,
     WelcomeUser,
+    WelcomeNewAccount,
+    ErrWrongPassword,
+    ErrAlreadyOnline,
+    ErrInvalidPassword,
     RoomListUpdated,
     TableRosterUpdated,
     JoinedRoomLog,
@@ -95,7 +100,9 @@ enum class Msg : unsigned {
     ActionNotAvailable,
     NotConnected,
     EnterPlayerName,
+    EnterPassword,
     NameLengthInvalid,
+    PasswordRules,
     JoiningAs,
     Authenticating,
     InvalidMaxPlayers,
@@ -163,5 +170,6 @@ std::string tr(Msg id, std::string_view arg0, std::string_view arg1, std::string
 std::string tr_phase(poker::protocol::GamePhase phase);
 std::string tr_action(poker::protocol::Action action);
 std::string tr_hand_category(poker::HandCategory category);
+std::string tr_auth_error(int error_code);
 
 } // namespace poker::client

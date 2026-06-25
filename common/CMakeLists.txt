@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 add_library(poker_core STATIC
+    src/auth.cpp
     src/deck.cpp
     src/hand_evaluator.cpp
     src/protocol.cpp

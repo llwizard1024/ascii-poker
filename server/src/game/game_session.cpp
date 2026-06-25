@@ -1,5 +1,7 @@
 #include "game/game_session.h"
 
+#include "storage/user_repository.h"
+
 #include <poker/error_codes.h>
 #include <poker/game_constants.h>
 #include <poker/hand_evaluator.h>
@@ -15,8 +17,12 @@ namespace poker::server {
 GameSession::GameSession(
     std::vector<std::shared_ptr<IPlayer>> players,
     std::unordered_map<IConnection*, IPlayer*> connection_map,
-    uint64_t room_id)
-    : players_(std::move(players))
+    uint64_t room_id,
+    UserRepository* user_repository,
+    std::unordered_map<std::string, uint32_t> bankrolls)
+    : user_repository_(user_repository)
+    , bankrolls_(std::move(bankrolls))
+    , players_(std::move(players))
     , connection_map_(std::move(connection_map))
     , room_id_(room_id)
     , phase_(poker::protocol::GamePhase::PreFlop)
@@ -105,7 +111,10 @@ void GameSession::start()
 
     for (const auto& player : players_) {
         if (chips_.find(player.get()) == chips_.end()) {
-            chips_[player.get()] = poker::STARTING_CHIPS;
+            const auto bankroll = bankrolls_.find(player->get_name());
+            chips_[player.get()] = bankroll != bankrolls_.end()
+                ? bankroll->second
+                : poker::STARTING_CHIPS;
         }
         auto hand = deck_.deal(2);
         hands_[player.get()] = std::move(hand);
@@ -121,6 +130,7 @@ void GameSession::start()
     begin_betting_round();
     current_player_index_ = first_to_act_preflop();
     phase_ = poker::protocol::GamePhase::PreFlop;
+    persist_all_chips();
     broadcast_state();
     ask_current_player();
 }
@@ -221,6 +231,7 @@ void GameSession::remove_player(ConnectionPtr connection)
 
 void GameSession::erase_player_state(IPlayer* player, ConnectionPtr connection)
 {
+    persist_player_chips(player);
     hands_.erase(player);
     chips_.erase(player);
     round_bets_.erase(player);
@@ -595,6 +606,7 @@ void GameSession::award_all_pots()
         const uint32_t remainder = side_pot.amount % static_cast<uint32_t>(winners.size());
 
         for (IPlayer* winner : winners) {
+            const uint32_t stack_before = chips_[winner];
             chips_[winner] += share;
             const auto& name = winner->get_name();
             if (std::find(winner_names.begin(), winner_names.end(), name) == winner_names.end()) {
@@ -608,10 +620,22 @@ void GameSession::award_all_pots()
                     winner_hand_labels.push_back({});
                 }
             }
-            spdlog::info("Player '{}' wins {} chips from a {}-chip pot",
-                name,
-                share,
-                side_pot.amount);
+            if (winners.size() == 1) {
+                spdlog::info(
+                    "Player '{}' awarded {}-chip pot (stack {} -> {})",
+                    name,
+                    side_pot.amount,
+                    stack_before,
+                    chips_[winner]);
+            }
+        }
+
+        if (winners.size() > 1) {
+            spdlog::info(
+                "{}-chip pot split among {} players ({} chips each)",
+                side_pot.amount,
+                winners.size(),
+                share);
         }
 
         if (remainder > 0) {
@@ -622,11 +646,49 @@ void GameSession::award_all_pots()
     }
 
     if (!winner_names.empty()) {
+        persist_all_chips();
+        broadcast_state();
         broadcast_hand_result(winner_names, winner_hand_labels, total_awarded);
     }
 
     pot_ = 0;
     total_contributed_.clear();
+}
+
+void GameSession::persist_player_chips(IPlayer* player)
+{
+    if (!user_repository_) {
+        return;
+    }
+
+    const auto it = chips_.find(player);
+    if (it == chips_.end()) {
+        return;
+    }
+
+    bankrolls_[player->get_name()] = it->second;
+
+    if (user_repository_->update_chips(player->get_name(), it->second)) {
+        spdlog::debug("Persisted {} chips for '{}'", it->second, player->get_name());
+    } else {
+        spdlog::warn("Failed to persist {} chips for '{}'", it->second, player->get_name());
+    }
+}
+
+void GameSession::persist_all_chips()
+{
+    uint32_t total = 0;
+    for (const auto& player : players_) {
+        persist_player_chips(player.get());
+        const auto it = chips_.find(player.get());
+        if (it != chips_.end()) {
+            total += it->second;
+        }
+    }
+    if (pot_ > 0) {
+        total += pot_;
+    }
+    spdlog::debug("Persisted table balances (stacks + pot = {})", total);
 }
 
 void GameSession::do_showdown()

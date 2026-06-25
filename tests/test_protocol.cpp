@@ -15,15 +15,15 @@ void test_roundtrip(const T& original)
     REQUIRE(nlohmann::json(original) == nlohmann::json(deserialized));
 }
 
-TEST_CASE("Hello round-trip", "[protocol]")
+TEST_CASE("Login round-trip", "[protocol]")
 {
-    Hello msg { "Alice" };
+    Login msg { "Alice", "secret1234" };
     test_roundtrip(msg);
 }
 
 TEST_CASE("Welcome round-trip", "[protocol]")
 {
-    Welcome msg { "Bob" };
+    Welcome msg { "Bob", 1500, true };
     test_roundtrip(msg);
 }
 
@@ -53,8 +53,17 @@ TEST_CASE("ListRooms round-trip", "[protocol]")
 
 TEST_CASE("LeftRoom round-trip", "[protocol]")
 {
-    LeftRoom msg { 42 };
+    LeftRoom msg { 42, 750, true };
     test_roundtrip(msg);
+}
+
+TEST_CASE("LeftRoom accepts legacy JSON without balance fields", "[protocol]")
+{
+    nlohmann::json j = { { "room_id", 7 } };
+    LeftRoom parsed = j.get<LeftRoom>();
+    REQUIRE(parsed.room_id == 7);
+    REQUIRE(parsed.your_chips == 0);
+    REQUIRE_FALSE(parsed.has_your_chips);
 }
 
 TEST_CASE("HandResult round-trip", "[protocol]")
@@ -165,11 +174,11 @@ TEST_CASE("YourTurn with available actions", "[protocol]")
 
 TEST_CASE("ClientMessage serialization for all variants", "[protocol]")
 {
-    SECTION("Hello")
+    SECTION("Login")
     {
-        ClientMessage msg = Hello { "Alice" };
+        ClientMessage msg = Login { "Alice", "pass1234" };
         nlohmann::json j = msg;
-        REQUIRE(j["type"] == "hello");
+        REQUIRE(j["type"] == "login");
         ClientMessage parsed = j.get<ClientMessage>();
         REQUIRE(nlohmann::json(msg) == nlohmann::json(parsed));
     }
@@ -283,7 +292,7 @@ TEST_CASE("ServerMessage serialization for all variants", "[protocol]")
     }
     SECTION("LeftRoom")
     {
-        ServerMessage msg = LeftRoom { 3 };
+        ServerMessage msg = LeftRoom { 3, 500, true };
         nlohmann::json j = msg;
         REQUIRE(j["type"] == "left_room");
         ServerMessage parsed = j.get<ServerMessage>();

@@ -2,6 +2,8 @@
 
 #include "network/connection_registry.h"
 #include "poker/error_codes.h"
+#include "poker/game_constants.h"
+#include "storage/user_repository.h"
 
 #include <spdlog/spdlog.h>
 
@@ -9,9 +11,25 @@
 
 namespace poker::server {
 
-Lobby::Lobby(std::shared_ptr<ConnectionRegistry> connection_registry)
+Lobby::Lobby(std::shared_ptr<ConnectionRegistry> connection_registry, UserRepository* user_repository)
     : connection_registry_(std::move(connection_registry))
+    , user_repository_(user_repository)
 {
+}
+
+std::optional<poker::protocol::ErrorCode> Lobby::check_player_bankroll(ConnectionPtr player) const
+{
+    if (!user_repository_) {
+        return std::nullopt;
+    }
+
+    const auto user = user_repository_->find_by_username(player->get_name());
+    const uint32_t chips = user.has_value() ? user->chips : 0;
+    if (chips < poker::BIG_BLIND) {
+        return poker::protocol::ErrorCode::NotEnoughChips;
+    }
+
+    return std::nullopt;
 }
 
 void Lobby::broadcast_room_list()
@@ -30,13 +48,19 @@ std::shared_ptr<Room> Lobby::create_room(const std::string& name, uint8_t max_pl
         return nullptr;
     }
 
+    if (const auto error = check_player_bankroll(creator)) {
+        spdlog::warn("Cannot create room: creator '{}' has insufficient chips", creator->get_name());
+        return nullptr;
+    }
+
     const auto player_rooms_it = player_rooms_.find(creator);
 
     if (player_rooms_it != player_rooms_.end()) {
         leave_room(creator);
     }
 
-    std::shared_ptr<Room> room = std::make_shared<Room>(next_room_id_++, name, max_players, creator);
+    std::shared_ptr<Room> room = std::make_shared<Room>(
+        next_room_id_++, name, max_players, creator, user_repository_);
     rooms_.push_back(room);
 
     room->add_player(creator);
@@ -52,6 +76,10 @@ std::shared_ptr<Room> Lobby::create_room(const std::string& name, uint8_t max_pl
 
 std::optional<poker::protocol::ErrorCode> Lobby::join_room(uint64_t room_id, ConnectionPtr player)
 {
+    if (const auto bankroll_error = check_player_bankroll(player)) {
+        return bankroll_error;
+    }
+
     if (player_rooms_.count(player) > 0 && player_rooms_[player]->get_id() == room_id) {
         spdlog::info("You are already in this room");
         return std::nullopt;
@@ -116,6 +144,20 @@ void Lobby::leave_room(ConnectionPtr player)
     }
 
     broadcast_room_list();
+}
+
+std::optional<uint32_t> Lobby::account_chips_for(const std::string& username) const
+{
+    if (!user_repository_) {
+        return std::nullopt;
+    }
+
+    const auto user = user_repository_->find_by_username(username);
+    if (!user.has_value()) {
+        return std::nullopt;
+    }
+
+    return user->chips;
 }
 
 std::optional<poker::protocol::ErrorCode> Lobby::start_game(ConnectionPtr player)

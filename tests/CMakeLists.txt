@@ -15,6 +15,11 @@ add_executable(poker_tests
     test_lobby.cpp
     test_integration.cpp
     test_player_name_registry.cpp
+    test_user_repository.cpp
+    test_login_auth.cpp
+    test_auth.cpp
+    test_database.cpp
+    test_chip_persistence.cpp
 )
 
 target_include_directories(poker_tests PRIVATE

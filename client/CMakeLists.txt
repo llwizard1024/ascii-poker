@@ -9,6 +9,7 @@ add_library(poker_client_lib STATIC
     src/i18n.cpp
     src/game_text.cpp
     src/ui_cards.cpp
+    src/ui_theme.cpp
     src/poker_ui.cpp
 )
 

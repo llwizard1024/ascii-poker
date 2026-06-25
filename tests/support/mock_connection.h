@@ -37,7 +37,7 @@ public:
 
 private:
     std::string name_;
-    bool authenticated_ = true;
+    bool authenticated_ = false;
     std::vector<poker::protocol::ServerMessage> sent_messages_;
 };
 

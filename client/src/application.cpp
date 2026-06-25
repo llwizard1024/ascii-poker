@@ -89,10 +89,10 @@ void ClientApplication::list_rooms()
     spdlog::info("Sending ListRooms");
 }
 
-void ClientApplication::send_hello(const std::string& player_name)
+void ClientApplication::send_login(const std::string& username, const std::string& password)
 {
-    client_->send(pp::ClientMessage { pp::Hello { player_name } });
-    spdlog::info("Sending Hello: player_name={}", player_name);
+    client_->send(pp::ClientMessage { pp::Login { username, password } });
+    spdlog::info("Sending Login: username={}", username);
 }
 
 void ClientApplication::create_room(const std::string& name, uint8_t max_players)

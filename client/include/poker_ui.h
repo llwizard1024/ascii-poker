@@ -28,6 +28,7 @@ private:
         RaiseInput,
         CreateNameInput,
         PlayerNameInput,
+        PasswordInput,
     };
 
     void notify_redraw();
@@ -35,7 +36,7 @@ private:
     void sync_control_visibility();
     void show_create_panel(bool show);
     void submit_create_room();
-    void submit_hello();
+    void submit_login();
     void submit_raise();
     void send_action(poker::protocol::Action action, std::optional<uint32_t> amount = std::nullopt);
     void send_preset_raise(uint32_t amount);
@@ -89,6 +90,7 @@ private:
     ftxui::Component create_name_input_;
     ftxui::Component create_size_input_;
     ftxui::Component player_name_input_;
+    ftxui::Component login_password_input_;
     ftxui::Component login_host_input_;
     ftxui::Component login_port_input_;
 
@@ -102,6 +104,7 @@ private:
     std::string create_room_name_;
     std::string create_max_players_ = "4";
     std::string player_name_input_value_;
+    std::string login_password_value_;
     std::string login_host_value_;
     std::string login_port_value_;
     bool show_login_controls_ = true;
@@ -121,7 +124,8 @@ private:
     bool action_pending_ = false;
     std::optional<poker::protocol::YourTurn> saved_your_turn_;
     PendingRefocus pending_refocus_ = PendingRefocus::None;
-    bool pending_auto_hello_ = false;
+    bool login_password_mode_ = true;
+    bool pending_auto_login_ = false;
     bool ring_bell_ = false;
 };
 

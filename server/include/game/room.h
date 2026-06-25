@@ -7,13 +7,21 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace poker::server {
 
+class UserRepository;
+
 class Room {
 public:
-    Room(uint64_t id, std::string name, uint8_t max_players, ConnectionPtr host);
+    Room(
+        uint64_t id,
+        std::string name,
+        uint8_t max_players,
+        ConnectionPtr host,
+        UserRepository* user_repository = nullptr);
     bool add_player(ConnectionPtr player);
     bool remove_player(ConnectionPtr player);
     poker::protocol::RoomInfo get_room_info() const;
@@ -27,9 +35,12 @@ public:
     void on_player_action(ConnectionPtr player, poker::protocol::Action action, std::optional<uint32_t> amount);
 
 private:
-    void start_game();
+    std::optional<poker::protocol::ErrorCode> start_game();
+    std::optional<poker::protocol::ErrorCode> load_player_bankrolls(
+        std::unordered_map<std::string, uint32_t>& bankrolls) const;
     void notify_all_about_joined();
 
+    UserRepository* user_repository_ = nullptr;
     uint64_t id_;
     std::string name_;
     uint8_t max_players_;
