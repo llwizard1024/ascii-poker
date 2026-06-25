@@ -31,6 +31,7 @@ public:
 
     bool is_connected() const;
     void reconnect();
+    void reconnect_to(const std::string& host, const std::string& port);
 
     bool quit_requested() const { return quit_flag_.load(); }
 

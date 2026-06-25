@@ -141,6 +141,12 @@ void ClientApplication::reconnect()
     client_->reconnect();
 }
 
+void ClientApplication::reconnect_to(const std::string& host, const std::string& port)
+{
+    client_->set_endpoint(host, port);
+    client_->reconnect();
+}
+
 void ClientApplication::player_action_from_command(const std::string& action_str, const std::vector<std::string>& args)
 {
     std::optional<uint32_t> amount = std::nullopt;

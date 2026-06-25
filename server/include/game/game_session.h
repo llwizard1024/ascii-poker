@@ -55,13 +55,18 @@ private:
     void do_showdown();
     void award_all_pots();
     std::vector<IPlayer*> find_winners_among(const std::vector<IPlayer*>& contenders) const;
-    void broadcast_hand_result(const std::vector<std::string>& winner_names, uint32_t amount);
+    void broadcast_hand_result(
+        const std::vector<std::string>& winner_names,
+        const std::vector<std::string>& winner_hand_labels,
+        uint32_t amount);
     void handle_single_winner(IPlayer* winner);
     void try_start_new_hand();
     void start_new_hand();
     void erase_player_state(IPlayer* player, ConnectionPtr connection);
     void fix_indices_after_removal(size_t removed_index);
     void continue_after_player_left(bool was_current);
+    void begin_betting_round();
+    void record_player_action(IPlayer* player, poker::protocol::Action action);
     std::vector<poker::protocol::PlayerState> build_player_states(bool reveal_hole_cards) const;
 
     std::vector<std::shared_ptr<IPlayer>> players_;
@@ -69,6 +74,7 @@ private:
     std::unordered_map<IPlayer*, std::vector<poker::Card>> hands_;
     std::unordered_set<IPlayer*> folded_players_;
     std::unordered_set<IPlayer*> all_in_players_;
+    std::unordered_set<IPlayer*> players_acted_;
 
     uint64_t room_id_;
     poker::Deck deck_;

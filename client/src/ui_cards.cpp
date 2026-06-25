@@ -56,6 +56,21 @@ namespace {
         return vbox({ text(top), text(mid), text(top) }) | (red ? color(Color::Red) : color(Color::White)) | bold;
     }
 
+    std::string player_role_suffix(const poker::protocol::PlayerState& player)
+    {
+        std::string suffix;
+        if (player.is_dealer) {
+            suffix += tr(Msg::PlayerDealer);
+        }
+        if (player.is_small_blind) {
+            suffix += tr(Msg::PlayerSmallBlind);
+        }
+        if (player.is_big_blind) {
+            suffix += tr(Msg::PlayerBigBlind);
+        }
+        return suffix;
+    }
+
     std::string player_status_suffix(const poker::protocol::PlayerState& player)
     {
         if (player.folded) {
@@ -120,6 +135,7 @@ Element render_table_seats(
         if (player.round_bet > 0) {
             line << tr(Msg::PlayerBet) << player.round_bet;
         }
+        line << player_role_suffix(player);
         line << player_status_suffix(player);
 
         Element seat = text(line.str()) | (active ? color(Color::Yellow) | bold : nothing);
@@ -141,12 +157,13 @@ Element render_table_seats(
     Elements top;
     Elements bottom;
     for (size_t i = 0; i < players.size(); ++i) {
-        (i < top_count ? top : bottom).push_back(render_seat(players[i]));
+        auto seat = render_seat(players[i]) | center;
+        (i < top_count ? top : bottom).push_back(seat);
     }
 
     return vbox({
         hbox(std::move(top)) | center,
-        text(""),
+        text("  --- pot area ---  ") | dim | center,
         hbox(std::move(bottom)) | center,
     });
 }

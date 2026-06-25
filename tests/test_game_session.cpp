@@ -14,6 +14,7 @@
 using namespace poker::server;
 using poker::test::MockConnection;
 using poker::test::find_message;
+using poker::test::find_last_message;
 
 namespace {
 
@@ -96,6 +97,101 @@ TEST_CASE("Minimum raise follows big blind increment after blinds", "[game_sessi
     REQUIRE(turn.has_value());
     REQUIRE(turn->min_amount == poker::BIG_BLIND + poker::BIG_BLIND);
     REQUIRE(poker::test::has_message<poker::protocol::YourTurn>(*alice_conn));
+}
+
+TEST_CASE("Heads-up BB gets option after SB completes call", "[game_session]")
+{
+    auto alice_conn = std::make_shared<MockConnection>("Alice");
+    auto bob_conn = std::make_shared<MockConnection>("Bob");
+
+    GameSession session = make_session({ alice_conn, bob_conn });
+    session.start();
+
+    const auto alice_turn = find_message<poker::protocol::YourTurn>(*alice_conn);
+    REQUIRE(alice_turn.has_value());
+    session.apply_action(alice_conn, poker::protocol::Action::Call, std::nullopt);
+
+    const auto bob_turn = find_last_message<poker::protocol::YourTurn>(*bob_conn);
+    REQUIRE(bob_turn.has_value());
+
+    const auto state = find_last_message<poker::protocol::GameStateUpdate>(*alice_conn);
+    REQUIRE(state.has_value());
+    REQUIRE(state->phase == poker::protocol::GamePhase::PreFlop);
+
+    session.apply_action(bob_conn, poker::protocol::Action::Check, std::nullopt);
+
+    const auto flop_state = find_last_message<poker::protocol::GameStateUpdate>(*alice_conn);
+    REQUIRE(flop_state.has_value());
+    REQUIRE(flop_state->phase == poker::protocol::GamePhase::Flop);
+}
+
+TEST_CASE("Three players must all act before flop after limping", "[game_session]")
+{
+    auto a_conn = std::make_shared<MockConnection>("A");
+    auto b_conn = std::make_shared<MockConnection>("B");
+    auto c_conn = std::make_shared<MockConnection>("C");
+
+    GameSession session = make_session({ a_conn, b_conn, c_conn });
+    session.start();
+
+    const auto a_turn = find_message<poker::protocol::YourTurn>(*a_conn);
+    REQUIRE(a_turn.has_value());
+    session.apply_action(a_conn, poker::protocol::Action::Call, std::nullopt);
+
+    const auto b_turn = find_last_message<poker::protocol::YourTurn>(*b_conn);
+    REQUIRE(b_turn.has_value());
+    session.apply_action(b_conn, poker::protocol::Action::Call, std::nullopt);
+
+    a_conn->clear_messages();
+    REQUIRE_FALSE(poker::test::has_message<poker::protocol::GameStateUpdate>(*a_conn));
+
+    const auto c_turn = find_last_message<poker::protocol::YourTurn>(*c_conn);
+    REQUIRE(c_turn.has_value());
+    session.apply_action(c_conn, poker::protocol::Action::Check, std::nullopt);
+
+    const auto flop_state = find_last_message<poker::protocol::GameStateUpdate>(*a_conn);
+    REQUIRE(flop_state.has_value());
+    REQUIRE(flop_state->phase == poker::protocol::GamePhase::Flop);
+}
+
+TEST_CASE("Three-way flop requires three checks to advance", "[game_session]")
+{
+    auto a_conn = std::make_shared<MockConnection>("A");
+    auto b_conn = std::make_shared<MockConnection>("B");
+    auto c_conn = std::make_shared<MockConnection>("C");
+
+    GameSession session = make_session({ a_conn, b_conn, c_conn });
+    session.start();
+
+    const auto a_preflop = find_message<poker::protocol::YourTurn>(*a_conn);
+    REQUIRE(a_preflop.has_value());
+    session.apply_action(a_conn, poker::protocol::Action::Call, std::nullopt);
+
+    const auto b_preflop = find_message<poker::protocol::YourTurn>(*b_conn);
+    REQUIRE(b_preflop.has_value());
+    session.apply_action(b_conn, poker::protocol::Action::Call, std::nullopt);
+
+    const auto c_preflop = find_message<poker::protocol::YourTurn>(*c_conn);
+    REQUIRE(c_preflop.has_value());
+    session.apply_action(c_conn, poker::protocol::Action::Check, std::nullopt);
+
+    session.apply_action(c_conn, poker::protocol::Action::Check, std::nullopt);
+
+    const auto b_flop = find_last_message<poker::protocol::YourTurn>(*b_conn);
+    REQUIRE(b_flop.has_value());
+    session.apply_action(b_conn, poker::protocol::Action::Check, std::nullopt);
+
+    const auto c_flop = find_last_message<poker::protocol::YourTurn>(*c_conn);
+    REQUIRE(c_flop.has_value());
+    session.apply_action(c_conn, poker::protocol::Action::Check, std::nullopt);
+
+    const auto a_flop = find_last_message<poker::protocol::YourTurn>(*a_conn);
+    REQUIRE(a_flop.has_value());
+    session.apply_action(a_conn, poker::protocol::Action::Check, std::nullopt);
+
+    const auto turn_state = find_last_message<poker::protocol::GameStateUpdate>(*a_conn);
+    REQUIRE(turn_state.has_value());
+    REQUIRE(turn_state->phase == poker::protocol::GamePhase::Turn);
 }
 
 TEST_CASE("Heads-up all-in preflop completes and starts next hand", "[game_session]")

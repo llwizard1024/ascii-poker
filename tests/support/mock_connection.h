@@ -63,4 +63,15 @@ std::optional<T> find_message(const MockConnection& connection)
     return std::nullopt;
 }
 
+template <typename T>
+std::optional<T> find_last_message(const MockConnection& connection)
+{
+    for (auto it = connection.sent_messages().rbegin(); it != connection.sent_messages().rend(); ++it) {
+        if (std::holds_alternative<T>(*it)) {
+            return std::get<T>(*it);
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace poker::test

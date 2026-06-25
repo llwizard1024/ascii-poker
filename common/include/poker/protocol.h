@@ -203,6 +203,9 @@ struct PlayerState {
     uint32_t round_bet = 0;
     bool folded = false;
     bool all_in = false;
+    bool is_dealer = false;
+    bool is_small_blind = false;
+    bool is_big_blind = false;
     std::vector<Card> hole_cards;
 };
 void to_json(nlohmann::json& j, const PlayerState& msg);
@@ -255,6 +258,7 @@ void from_json(const nlohmann::json& j, LeftRoom& msg);
 struct HandResult {
     std::vector<std::string> winner_names;
     uint32_t pot_amount;
+    std::vector<std::string> winner_hand_labels;
 };
 void to_json(nlohmann::json& j, const HandResult& msg);
 void from_json(const nlohmann::json& j, HandResult& msg);

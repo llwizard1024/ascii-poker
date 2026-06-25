@@ -118,6 +118,7 @@ void GameSession::start()
     }
 
     post_blinds();
+    begin_betting_round();
     current_player_index_ = first_to_act_preflop();
     phase_ = poker::protocol::GamePhase::PreFlop;
     broadcast_state();
@@ -166,6 +167,7 @@ void GameSession::next_phase()
     }
 
     current_player_index_ = first_to_act_postflop();
+    begin_betting_round();
     broadcast_state();
     ask_current_player();
 }
@@ -225,6 +227,7 @@ void GameSession::erase_player_state(IPlayer* player, ConnectionPtr connection)
     total_contributed_.erase(player);
     folded_players_.erase(player);
     all_in_players_.erase(player);
+    players_acted_.erase(player);
     connection_map_.erase(connection.get());
 }
 
@@ -324,6 +327,7 @@ void GameSession::apply_action(ConnectionPtr connection, poker::protocol::Action
     } break;
     }
 
+    record_player_action(current, action);
     broadcast_action_event(current->get_name(), action, amount);
 
     if (count_active_players() == 1) {
@@ -368,14 +372,20 @@ std::vector<poker::protocol::PlayerState> GameSession::build_player_states(bool 
     std::vector<poker::protocol::PlayerState> states;
     states.reserve(players_.size());
 
-    for (const auto& player : players_) {
-        IPlayer* p = player.get();
+    const size_t sb = sb_index();
+    const size_t bb = bb_index();
+
+    for (size_t i = 0; i < players_.size(); ++i) {
+        IPlayer* p = players_[i].get();
         poker::protocol::PlayerState state;
         state.name = p->get_name();
         state.chips = chips_.at(p);
         state.round_bet = round_bets_.at(p);
         state.folded = folded_players_.count(p) > 0;
         state.all_in = all_in_players_.count(p) > 0;
+        state.is_dealer = i == dealer_index_;
+        state.is_small_blind = i == sb;
+        state.is_big_blind = i == bb;
         if (reveal_hole_cards && !state.folded) {
             state.hole_cards = hands_.at(p);
         }
@@ -445,8 +455,24 @@ bool GameSession::is_round_complete() const
         if (player_bet < current_bet_ && all_in_players_.count(p) == 0) {
             return false;
         }
+        if (can_player_act(p) && players_acted_.count(p) == 0) {
+            return false;
+        }
     }
     return true;
+}
+
+void GameSession::begin_betting_round()
+{
+    players_acted_.clear();
+}
+
+void GameSession::record_player_action(IPlayer* player, poker::protocol::Action action)
+{
+    if (action == poker::protocol::Action::Raise) {
+        players_acted_.clear();
+    }
+    players_acted_.insert(player);
 }
 
 bool GameSession::can_player_act(IPlayer* player) const
@@ -550,6 +576,7 @@ void GameSession::award_all_pots()
     const auto side_pots = poker::compute_side_pots(states);
 
     std::vector<std::string> winner_names;
+    std::vector<std::string> winner_hand_labels;
     uint32_t total_awarded = 0;
 
     for (const auto& side_pot : side_pots) {
@@ -572,6 +599,14 @@ void GameSession::award_all_pots()
             const auto& name = winner->get_name();
             if (std::find(winner_names.begin(), winner_names.end(), name) == winner_names.end()) {
                 winner_names.push_back(name);
+                if (community_cards_.size() >= 3) {
+                    std::vector<poker::Card> cards = hands_.at(winner);
+                    cards.insert(cards.end(), community_cards_.begin(), community_cards_.end());
+                    winner_hand_labels.push_back(
+                        poker::hand_category_label(poker::evaluate_best(cards).category));
+                } else {
+                    winner_hand_labels.push_back({});
+                }
             }
             spdlog::info("Player '{}' wins {} chips from a {}-chip pot",
                 name,
@@ -587,7 +622,7 @@ void GameSession::award_all_pots()
     }
 
     if (!winner_names.empty()) {
-        broadcast_hand_result(winner_names, total_awarded);
+        broadcast_hand_result(winner_names, winner_hand_labels, total_awarded);
     }
 
     pot_ = 0;
@@ -620,10 +655,14 @@ void GameSession::do_showdown()
     try_start_new_hand();
 }
 
-void GameSession::broadcast_hand_result(const std::vector<std::string>& winner_names, uint32_t amount)
+void GameSession::broadcast_hand_result(
+    const std::vector<std::string>& winner_names,
+    const std::vector<std::string>& winner_hand_labels,
+    uint32_t amount)
 {
     poker::protocol::HandResult result;
     result.winner_names = winner_names;
+    result.winner_hand_labels = winner_hand_labels;
     result.pot_amount = amount;
 
     for (const auto& player : players_) {

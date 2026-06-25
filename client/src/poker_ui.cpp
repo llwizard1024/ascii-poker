@@ -1,6 +1,7 @@
 #include "poker_ui.h"
 
 #include "client_settings.h"
+#include "game_text.h"
 #include "i18n.h"
 #include "poker/game_constants.h"
 #include "ui_cards.h"
@@ -9,6 +10,7 @@
 #include <ftxui_all.hpp>
 
 #include <algorithm>
+#include <iostream>
 #include <optional>
 #include <sstream>
 #include <variant>
@@ -19,12 +21,20 @@ using namespace ftxui;
 
 namespace {
 
-    std::string hand_result_text(const poker::protocol::HandResult& result)
+    std::string hand_result_text(
+        const poker::protocol::HandResult& result,
+        const std::optional<poker::protocol::GameStateUpdate>& game_state)
     {
         std::ostringstream ss;
         ss << tr(Msg::WinnerPrefix);
-        for (const auto& name : result.winner_names) {
-            ss << " " << name;
+        for (size_t i = 0; i < result.winner_names.size(); ++i) {
+            ss << " " << result.winner_names[i];
+            if (game_state.has_value()) {
+                const std::string label = winner_hand_label(result.winner_names[i], *game_state);
+                if (!label.empty()) {
+                    ss << " (" << label << ")";
+                }
+            }
         }
         ss << "  |  " << tr(Msg::PotAmountPrefix) << " " << result.pot_amount;
         return ss.str();
@@ -65,6 +75,8 @@ void PokerUI::initialize_session(const ClientSettings& settings, const std::stri
     std::lock_guard lock(mtx_);
     state_.server_host = host;
     state_.server_port = port;
+    login_host_value_ = host;
+    login_port_value_ = port;
     state_.set_connection(ConnectionStatus::Connecting);
     if (!settings.player_name.empty()) {
         player_name_input_value_ = settings.player_name;
@@ -97,14 +109,24 @@ void PokerUI::refresh_button_labels()
     btn_.room_down = tr(Msg::BtnRoomDown);
 }
 
+void PokerUI::update_turn_button_labels()
+{
+    btn_.call = tr(Msg::BtnCall);
+    if (state_.your_turn.has_value() && state_.your_turn->to_call > 0) {
+        btn_.call = tr(Msg::BtnCallAmount, std::to_string(state_.your_turn->to_call));
+    }
+}
+
 void PokerUI::toggle_language()
 {
     set_language(current_language() == Language::English ? Language::Russian : Language::English);
-    refresh_button_labels();
 
     ClientSettings settings;
     {
         std::lock_guard lock(mtx_);
+        refresh_button_labels();
+        update_turn_button_labels();
+        rebuild_room_labels();
         settings.player_name = state_.player_name;
         settings.host = state_.server_host;
         settings.port = state_.server_port;
@@ -116,12 +138,20 @@ void PokerUI::toggle_language()
 
 void PokerUI::on_connection_changed(const ConnectionStatus status)
 {
+    bool auto_hello = false;
     {
         std::lock_guard lock(mtx_);
         state_.set_connection(status);
         sync_control_visibility();
+        if (pending_auto_hello_ && status == ConnectionStatus::Connected) {
+            auto_hello = true;
+            pending_auto_hello_ = false;
+        }
     }
     notify_redraw();
+    if (auto_hello) {
+        submit_hello();
+    }
 }
 
 void PokerUI::lobby_room_step(const int delta)
@@ -144,6 +174,8 @@ void PokerUI::lobby_room_step(const int delta)
 bool PokerUI::text_input_has_focus() const
 {
     return (player_name_input_ && player_name_input_->Focused())
+        || (login_host_input_ && login_host_input_->Focused())
+        || (login_port_input_ && login_port_input_->Focused())
         || (create_name_input_ && create_name_input_->Focused())
         || (create_size_input_ && create_size_input_->Focused())
         || (raise_input_ && raise_input_->Focused());
@@ -179,6 +211,7 @@ void PokerUI::sync_control_visibility()
         show_raise_ = state_.has_action(poker::protocol::Action::Raise);
         show_raise_presets_ = show_raise_;
     }
+    update_turn_button_labels();
 }
 
 void PokerUI::apply_pending_refocus()
@@ -241,6 +274,7 @@ void PokerUI::add_server_message(const poker::protocol::ServerMessage& msg)
             action_pending_ = false;
             saved_your_turn_.reset();
             raise_amount_ = std::to_string(state_.your_turn->min_amount);
+            ring_bell_ = true;
         } else if (std::holds_alternative<poker::protocol::LeftRoom>(msg)) {
             action_pending_ = false;
             saved_your_turn_.reset();
@@ -325,9 +359,14 @@ void PokerUI::submit_hello()
     }
 
     std::string name;
+    std::string host;
+    std::string port;
+    bool endpoint_changed = false;
     {
         std::lock_guard lock(mtx_);
         name = player_name_input_value_;
+        host = login_host_value_;
+        port = login_port_value_;
         const auto trim_start = name.find_first_not_of(" \t\r\n");
         if (trim_start == std::string::npos) {
             state_.append_log(tr(Msg::EnterPlayerName));
@@ -344,10 +383,39 @@ void PokerUI::submit_hello()
             notify_redraw();
             return;
         }
+
+        endpoint_changed = host != state_.server_host || port != state_.server_port;
         state_.player_name = name;
+        state_.server_host = host;
+        state_.server_port = port;
+    }
+
+    if (endpoint_changed) {
+        pending_auto_hello_ = true;
+        app_->reconnect_to(host, port);
+        {
+            std::lock_guard lock(mtx_);
+            state_.append_log(tr(Msg::JoiningAs, name));
+            state_.status_message = tr(Msg::ConnectingTo, host + ":" + port);
+        }
+        notify_redraw();
+        return;
+    }
+
+    if (!app_->is_connected()) {
+        std::lock_guard lock(mtx_);
+        state_.append_log(tr(Msg::NotConnected));
+        notify_redraw();
+        return;
     }
 
     app_->send_hello(name);
+
+    save_client_settings(ClientSettings {
+        name,
+        host,
+        port,
+        language_code(current_language()) });
 
     {
         std::lock_guard lock(mtx_);
@@ -439,7 +507,7 @@ Element PokerUI::render_header() const
         title += "  |  " + state_.player_name;
     }
     if (state_.room_id.has_value()) {
-        title += "  |  Room " + std::to_string(*state_.room_id);
+        title += "  |  " + tr(Msg::HeaderRoom, std::to_string(*state_.room_id));
     }
 
     return vbox({
@@ -462,9 +530,11 @@ Element PokerUI::render_login() const
     return vbox(
         text(tr(Msg::EnterYourName)) | bold,
         separator(),
-        hbox(text(" " + tr(Msg::NameLabel) + " "), text(player_name_input_value_.empty() ? tr(Msg::TypeBelow) : player_name_input_value_)),
-        separator(),
-        text(ready ? tr(Msg::PressJoinWhenReady) : tr(Msg::WaitingForConnection)) | dim);
+        text(tr(Msg::NameLabel) + " / " + tr(Msg::HostLabel) + " / " + tr(Msg::PortLabel) + " — " + tr(Msg::TypeBelow)) | dim,
+        text(tr(Msg::PressJoinWhenReady)) | dim,
+        text(ready ? tr(Msg::ConnectedTo, state_.server_host + ":" + state_.server_port)
+                   : tr(Msg::WaitingForConnection))
+            | dim);
 }
 
 Element PokerUI::render_disconnected() const
@@ -547,7 +617,10 @@ Element PokerUI::render_hand_result_banner() const
     if (!state_.last_hand_result.has_value()) {
         return text("");
     }
-    return text(hand_result_text(*state_.last_hand_result)) | color(Color::Cyan) | bold | center;
+    return vbox({
+        text(hand_result_text(*state_.last_hand_result, state_.game_state)) | color(Color::Cyan) | bold | center,
+        text(tr(Msg::NextHandSoon)) | dim | center,
+    });
 }
 
 Element PokerUI::render_game_table() const
@@ -580,7 +653,7 @@ Element PokerUI::render_game_table() const
         seats,
     };
 
-    return vbox(std::move(body)) | bgcolor(Color::Green);
+    return vbox(std::move(body));
 }
 
 Element PokerUI::render_body() const
@@ -603,8 +676,13 @@ Element PokerUI::render_body() const
 Element PokerUI::render_log_panel() const
 {
     Elements lines;
-    const size_t start = state_.log.size() > 8 ? state_.log.size() - 8 : 0;
-    for (size_t i = start; i < state_.log.size(); ++i) {
+    const size_t visible_lines = 8;
+    const size_t total = state_.log.size();
+    const size_t max_offset = total > visible_lines ? total - visible_lines : 0;
+    const size_t offset = static_cast<size_t>(std::min(log_scroll_offset_, static_cast<int>(max_offset)));
+    const size_t end = total > offset ? total - offset : 0;
+    const size_t start = end > visible_lines ? end - visible_lines : 0;
+    for (size_t i = start; i < end; ++i) {
         lines.push_back(text(state_.log[i]) | dim);
     }
     if (lines.empty()) {
@@ -652,6 +730,15 @@ bool PokerUI::handle_hotkeys(const Event event)
                 selected_room_index_ = std::max(0, selected_room_index_ - 1);
                 return true;
             }
+        }
+        if (event == Event::Character('[')) {
+            const size_t max_offset = state_.log.size() > 8 ? state_.log.size() - 8 : 0;
+            log_scroll_offset_ = std::min(log_scroll_offset_ + 1, static_cast<int>(max_offset));
+            return true;
+        }
+        if (event == Event::Character(']')) {
+            log_scroll_offset_ = std::max(0, log_scroll_offset_ - 1);
+            return true;
         }
 
         if (event == Event::Character('l') || event == Event::Character('L')) {
@@ -711,9 +798,13 @@ void PokerUI::run()
     });
 
     player_name_input_ = Input(&player_name_input_value_, "your name");
+    login_host_input_ = Input(&login_host_value_, "host");
+    login_port_input_ = Input(&login_port_value_, "port");
     auto login_lang_btn = Button(&btn_.lang, [this] { toggle_language(); });
     auto login_controls = Container::Vertical(Components {
         player_name_input_,
+        login_host_input_,
+        login_port_input_,
         Container::Horizontal(Components { enter_btn, login_lang_btn, login_quit_btn }),
     });
 
@@ -761,6 +852,7 @@ void PokerUI::run()
     auto reconnect_btn = Button(&btn_.reconnect, [this] {
         {
             std::lock_guard lock(mtx_);
+            pending_auto_hello_ = !state_.player_name.empty();
             state_.reset_play_session();
             state_.connection = ConnectionStatus::Connecting;
             state_.status_message = tr(Msg::ConnectingTo, state_.server_host + ":" + state_.server_port);
@@ -902,6 +994,11 @@ void PokerUI::run()
     auto renderer = Renderer(root, [this, root] {
         std::lock_guard lock(mtx_);
         apply_pending_refocus();
+
+        if (ring_bell_) {
+            ring_bell_ = false;
+            std::cout << '\a' << std::flush;
+        }
 
         return vbox(
                    render_ui(),

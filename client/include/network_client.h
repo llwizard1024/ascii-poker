@@ -33,6 +33,7 @@ public:
 
     void start();
     void reconnect();
+    void set_endpoint(std::string host, std::string port);
     void send(const poker::protocol::ClientMessage& msg);
     void set_message_handler(MessageHandler handler);
     void set_connection_handler(ConnectionHandler handler);

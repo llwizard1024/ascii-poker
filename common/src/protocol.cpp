@@ -172,6 +172,9 @@ void to_json(nlohmann::json& j, const PlayerState& msg)
         { "round_bet", msg.round_bet },
         { "folded", msg.folded },
         { "all_in", msg.all_in },
+        { "is_dealer", msg.is_dealer },
+        { "is_small_blind", msg.is_small_blind },
+        { "is_big_blind", msg.is_big_blind },
         { "hole_cards", msg.hole_cards }
     };
 }
@@ -183,6 +186,21 @@ void from_json(const nlohmann::json& j, PlayerState& msg)
     j.at("round_bet").get_to(msg.round_bet);
     j.at("folded").get_to(msg.folded);
     j.at("all_in").get_to(msg.all_in);
+    if (j.contains("is_dealer")) {
+        j.at("is_dealer").get_to(msg.is_dealer);
+    } else {
+        msg.is_dealer = false;
+    }
+    if (j.contains("is_small_blind")) {
+        j.at("is_small_blind").get_to(msg.is_small_blind);
+    } else {
+        msg.is_small_blind = false;
+    }
+    if (j.contains("is_big_blind")) {
+        j.at("is_big_blind").get_to(msg.is_big_blind);
+    } else {
+        msg.is_big_blind = false;
+    }
     if (j.contains("hole_cards")) {
         j.at("hole_cards").get_to(msg.hole_cards);
     } else {
@@ -300,7 +318,8 @@ void to_json(nlohmann::json& j, const HandResult& msg)
 {
     j = nlohmann::json {
         { "winner_names", msg.winner_names },
-        { "pot_amount", msg.pot_amount }
+        { "pot_amount", msg.pot_amount },
+        { "winner_hand_labels", msg.winner_hand_labels }
     };
 }
 
@@ -308,6 +327,11 @@ void from_json(const nlohmann::json& j, HandResult& msg)
 {
     j.at("winner_names").get_to(msg.winner_names);
     j.at("pot_amount").get_to(msg.pot_amount);
+    if (j.contains("winner_hand_labels")) {
+        j.at("winner_hand_labels").get_to(msg.winner_hand_labels);
+    } else {
+        msg.winner_hand_labels.clear();
+    }
 }
 
 void to_json(nlohmann::json& j, const ClientMessage& msg)

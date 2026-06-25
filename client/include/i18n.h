@@ -130,6 +130,21 @@ enum class Msg : unsigned {
     RaiseRange,
     LangEnglish,
     LangRussian,
+    PlayerDealer,
+    PlayerSmallBlind,
+    PlayerBigBlind,
+    HostLabel,
+    PortLabel,
+    NextHandSoon,
+    PreflopPocketPair,
+    PreflopSuited,
+    PreflopBroadway,
+    PreflopConnector,
+    PreflopAce,
+    PreflopHighCard,
+    HeaderRoom,
+    ErrorPrefix,
+    BtnCallAmount,
     Count
 };
 

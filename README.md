@@ -1,18 +1,12 @@
 # ascii-poker
 
-ASCII-style Texas Hold'em poker client and server written in C++20.
+Multiplayer Texas Hold'em poker with an ASCII terminal UI. Native C++20 client and TCP server — no web stack, no external runtime beyond a C++ toolchain.
 
-## Project layout
+Cards, table, and controls render in the terminal via [FTXUI](https://github.com/ArthurSonzogni/FTXUI). The server is authoritative for all game logic; the client displays state and sends player actions.
 
-```
-common/       Shared poker logic, protocol, packet framing
-server/       TCP server, lobby, rooms, game sessions (poker::server)
-client/       FTXUI terminal client (poker::client)
-third_party/  Vendored deps: asio, spdlog, json, FTXUI
-tests/        Catch2 unit and integration tests
-```
+**Languages:** English and Russian (toggle with `L` in the client).
 
-## Build
+## Quick start
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Debug
@@ -20,88 +14,150 @@ cmake --build build
 ctest --test-dir build
 ```
 
-## Run
+Or use the helper script (clean rebuild):
+
+```bash
+./build.sh              # build everything
+./build.sh poker_client # build one target
+```
+
+### Run
 
 Terminal 1 — server (default port `12345`):
 
 ```bash
 ./build/server/poker_server
-# or custom port:
-./build/server/poker_server 8080
+./build/server/poker_server 8080   # custom port
 ```
 
 Terminal 2 — client:
 
 ```bash
 ./build/client/poker_client
-# or custom host/port:
-./build/client/poker_client 127.0.0.1 8080
+./build/client/poker_client 127.0.0.1 8080   # custom host/port
 ```
 
-## Client UI
+CLI arguments override defaults. The client also reads and writes `~/.ascii-poker.conf` (player name, host, port, language).
 
-The client uses an interactive terminal UI (FTXUI):
+## Client
 
-| Screen | Actions |
-|--------|---------|
-| **Lobby** | `Up`/`Down` select room, `Refresh`, `Create`, `Join`, `Quit` |
-| **Create room** | Enter name and max players, `Confirm` / `Cancel` |
-| **Waiting room** | Player list, host sees `Start` (min 2 players), `Leave`, `Quit` |
-| **In game** | Table with cards and pot; `Fold` / `Check` / `Call` / `Raise` on your turn |
+### Screens
 
-Rooms marked `(in game)` in the lobby cannot be joined.
+| Screen | What you see | Main actions |
+|--------|----------------|--------------|
+| **Login** | Name, host, port fields | `Join`, `Lang`, `Quit` |
+| **Lobby** | Room list with player counts | `Refresh`, `Create`, `Join`, `Leave`, `Quit` |
+| **Create room** | Room name and max players | `Confirm`, `Cancel` |
+| **Waiting room** | Seated players, host marker | Host: `Start` (≥2 players), `Leave`, `Quit` |
+| **In game** | Table, cards, pot, action bar | `Fold` / `Check` / `Call` / `Raise`, presets, `Leave` |
+| **Disconnected** | Connection lost message | `Reconnect`, `Quit` |
 
-Red cards = hearts/diamonds. Active player is marked with `>>`.
+Rooms marked **(in game)** cannot be joined. After disconnect, **Reconnect** restores the TCP session and re-authenticates with your saved name.
 
-## Client commands (legacy)
+### Hotkeys
 
-Text commands still work if passed programmatically; the UI uses buttons instead:
+Hotkeys work when no text field is focused.
 
-| Command | Example | Description |
-|---------|---------|-------------|
-| `list_rooms` | `list_rooms` | Show available rooms |
-| `create_room` | `create_room "My Room" 4` | Create a room (2–255 players) |
-| `join_room` | `join_room 1` | Join room by id |
-| `leave_room` | `leave_room` | Leave current room |
-| `start_game` | `start_game` | Host starts the game (min 2 players) |
-| `action` | `action fold` | Player action: `fold`, `check`, `call`, `raise <amount>` |
-| `quit` | `quit` | Exit client |
+| Context | Keys | Action |
+|---------|------|--------|
+| Lobby | `j` / `k` or `↑` / `↓` | Select room |
+| Lobby | `▲` / `▼` buttons | Same as above |
+| In game (your turn) | `f` | Fold |
+| In game (your turn) | `c` | Check or Call |
+| In game (your turn) | `r` | Focus raise amount |
+| Any screen | `[` / `]` | Scroll event log |
+| Any screen | `L` | Toggle English ↔ Russian |
+| Login | `Enter` | Join (same as `Join` button) |
 
-The room host can press **Start** when at least two players are seated. The game also auto-starts when a room reaches `max_players`.
+On your turn, raise presets are available: **Min**, **½ pot**, **Pot**, **All-in**. The Call button shows the amount when a call is required (e.g. `Call 20`).
 
-Blinds are posted automatically each hand (SB = 10, BB = 20, starting stack = 1000). Side pots are calculated when players go all-in with different stack sizes.
+### Table display
 
-If a player leaves or disconnects during a hand, they are auto-folded and the game continues when at least two players remain in the room. When only one player is left, the active game session ends and the remaining player stays in the lobby.
+- Red suits: hearts ♥ and diamonds ♦
+- Active player: `>>` prefix
+- Dealer / blinds: `[D]`, `[SB]`, `[BB]`
+- Your seat: `(you)` suffix
+- Folded / all-in: `[fold]`, `[all-in]`
+- Preflop hand hint (e.g. pocket pair, suited connectors) and made-hand hint after the board deals
+- Showdown banner shows winners, pot, and winning hand category
 
-The room list is pushed to all connected clients when rooms are created, joined, left, or a game starts.
+### Settings file
+
+`~/.ascii-poker.conf`:
+
+```ini
+player_name=Alice
+host=127.0.0.1
+port=12345
+language=en
+```
+
+Use `language=ru` for Russian. Settings are saved after a successful login and when the language is changed.
+
+## Game rules (server)
+
+| Parameter | Value |
+|-----------|-------|
+| Starting stack | 1000 chips |
+| Small blind | 10 |
+| Big blind | 20 |
+
+- Blinds are posted automatically at the start of each hand; the dealer button rotates.
+- Betting rounds follow standard Hold'em order; side pots are computed for multi-way all-ins.
+- The host can **Start** with at least two players; the game also auto-starts when the room is full.
+- A player who leaves or disconnects mid-hand is auto-folded. The session continues if at least two players remain in the room; when only one is left, the hand is resolved and the session ends.
+- The room list is broadcast to all connected clients when rooms are created, joined, left, or a game starts.
 
 ## Protocol
 
-Messages are length-prefixed JSON (4-byte big-endian header + UTF-8 body).
-
-Envelope format:
+TCP, async I/O (Asio). Messages are length-prefixed JSON: 4-byte big-endian size + UTF-8 body.
 
 ```json
 { "type": "join_room", "data": { ... } }
 ```
 
-Server error codes are defined in `common/include/poker/error_codes.h`.
+Message types and structs: `common/include/poker/protocol.h`  
+Error codes: `common/include/poker/error_codes.h`
 
-## Dependencies
+## Project layout
 
-All third-party code is vendored under `third_party/` (headers in `third_party/include/`, FTXUI in `third_party/ftxui/`) and stays in the repository.
-Do not add duplicate copies under `client/` or `server/`.
+```
+common/       Shared poker logic, protocol, packet framing (poker_core)
+server/       TCP server, lobby, rooms, game sessions (poker::server)
+client/       FTXUI terminal client (poker::client)
+third_party/  Vendored: asio, spdlog, nlohmann/json, FTXUI, Catch2
+tests/        Unit and integration tests
+scripts/      check-format.sh
+```
 
-## Code style
+Build outputs:
 
-Project sources use [clang-format](https://clang.llvm.org/docs/ClangFormat.html) (see `.clang-format`). Check before pushing:
+- `build/server/poker_server`
+- `build/client/poker_client`
+- `build/tests/poker_tests`
+
+## Development
+
+Run tests:
+
+```bash
+ctest --test-dir build --output-on-failure
+```
+
+Check formatting:
 
 ```bash
 bash scripts/check-format.sh
 ```
 
-To apply formatting:
+Apply clang-format:
 
 ```bash
 git ls-files '*.cpp' '*.h' | grep -v '^third_party/' | grep -v '^tests/external/' | grep -v '/ftxui/' | xargs clang-format -i
 ```
+
+CI (GitHub Actions) configures, builds, and runs the test suite on each push.
+
+## Dependencies
+
+All third-party code is vendored under `third_party/` and committed to the repository. Do not add duplicate copies under `client/` or `server/`.

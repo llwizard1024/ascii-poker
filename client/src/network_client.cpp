@@ -52,6 +52,12 @@ void NetworkClient::reconnect()
     begin_connect();
 }
 
+void NetworkClient::set_endpoint(std::string host, std::string port)
+{
+    host_ = std::move(host);
+    port_ = std::move(port);
+}
+
 void NetworkClient::begin_connect()
 {
     if (connection_state_ == ConnectionState::Connecting) {

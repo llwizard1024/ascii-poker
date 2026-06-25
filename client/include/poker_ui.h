@@ -41,6 +41,7 @@ private:
     void send_preset_raise(uint32_t amount);
     void apply_pending_refocus();
     void refresh_button_labels();
+    void update_turn_button_labels();
     void toggle_language();
     void lobby_room_step(int delta);
     bool text_input_has_focus() const;
@@ -88,16 +89,21 @@ private:
     ftxui::Component create_name_input_;
     ftxui::Component create_size_input_;
     ftxui::Component player_name_input_;
+    ftxui::Component login_host_input_;
+    ftxui::Component login_port_input_;
 
     mutable std::mutex mtx_;
     ClientViewState state_;
 
     int selected_room_index_ = 0;
+    int log_scroll_offset_ = 0;
     std::vector<std::string> room_labels_;
     bool show_create_panel_ = false;
     std::string create_room_name_;
     std::string create_max_players_ = "4";
     std::string player_name_input_value_;
+    std::string login_host_value_;
+    std::string login_port_value_;
     bool show_login_controls_ = true;
     bool show_lobby_controls_ = false;
     bool show_create_controls_ = false;
@@ -115,6 +121,8 @@ private:
     bool action_pending_ = false;
     std::optional<poker::protocol::YourTurn> saved_your_turn_;
     PendingRefocus pending_refocus_ = PendingRefocus::None;
+    bool pending_auto_hello_ = false;
+    bool ring_bell_ = false;
 };
 
 } // namespace poker::client

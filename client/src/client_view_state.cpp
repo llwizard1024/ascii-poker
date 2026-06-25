@@ -173,7 +173,7 @@ void ClientViewState::apply_message(const poker::protocol::ServerMessage& msg)
             append_log(tr(Msg::LeftRoomLog, std::to_string(left_id)));
             status_message = tr(Msg::InLobby);
         } else if constexpr (std::is_same_v<T, poker::protocol::Error>) {
-            append_log("Error: " + concrete.description);
+            append_log(tr(Msg::ErrorPrefix, concrete.description));
             status_message = concrete.description;
         }
     },
